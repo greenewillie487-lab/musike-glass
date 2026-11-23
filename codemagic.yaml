@@ -10,10 +10,8 @@ workflows:
         XCODE_PROJECT: mobile/ios/App/App.xcodeproj
         XCODE_SCHEME: App
     scripts:
-      - name: Install pnpm
-        script: npm install -g pnpm@10.15.0
       - name: Install JS dependencies
-        script: pnpm install --frozen-lockfile
+        script: npx -y pnpm@10.15.0 install --frozen-lockfile
       - name: Build unsigned app
         script: |
           xcodebuild \
