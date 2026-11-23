@@ -1,0 +1,47 @@
+name: Build Musike Liquid Glass
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.15.0
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Show Xcode
+        run: xcodebuild -version
+
+      - name: Build unsigned iOS app
+        run: |
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath .derived \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package IPA
+        run: |
+          APP=$(find .derived/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          cp -R mobile/ios/App/public "$APP/public"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qr Musike-LiquidGlass.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Musike-LiquidGlass
+          path: Musike-LiquidGlass.ipa
+          retention-days: 30
