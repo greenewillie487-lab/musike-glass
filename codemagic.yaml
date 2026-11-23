@@ -47,3 +47,53 @@ workflows:
     artifacts:
       - $CM_BUILD_DIR/Musike-iOS27-LiquidGlass.ipa
       - /tmp/xcodebuild_logs/*.log
+
+  ios-simulator-preview:
+    name: Native glass preview (simulator screenshot only)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      xcode: edge
+      node: v22.11.0
+      vars:
+        XCODE_PROJECT: mobile/ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+    scripts:
+      - name: Install JS dependencies
+        script: npx -y pnpm@10.15.0 install --frozen-lockfile
+      - name: Stage Capacitor plugin sources
+        script: |
+          mkdir -p "$CM_BUILD_DIR/ios-plugins"
+          for p in app filesystem keyboard share; do
+            SRC=$(find "$CM_BUILD_DIR/node_modules/.pnpm" -maxdepth 6 -type d -path "*@capacitor+$p@*/node_modules/@capacitor/$p" | head -1)
+            test -n "$SRC"
+            DST="$CM_BUILD_DIR/ios-plugins/Capacitor$(echo "$p" | tr '[:lower:]' '[:upper:]' | cut -c1)$(echo "$p" | cut -c2-)"
+            cp -R "$SRC" "$DST"
+          done
+      - name: Build for iOS 27 simulator
+        script: |
+          xcodebuild \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$CM_BUILD_DIR/.derived-sim" \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+      - name: Boot simulator and capture native glass
+        script: |
+          UDID=$(xcrun simctl list devices available | grep -m1 'iPhone 17 (' | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          test -n "$UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          APP=$(find "$CM_BUILD_DIR/.derived-sim/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name 'App.app' | head -1)
+          test -n "$APP"
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" app.musike.ios || true
+          sleep 18
+          xcrun simctl io "$UDID" screenshot "$CM_BUILD_DIR/native-glass-preview.png"
+    artifacts:
+      - $CM_BUILD_DIR/native-glass-preview.png
