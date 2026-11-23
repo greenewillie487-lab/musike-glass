@@ -38,6 +38,8 @@ workflows:
         script: |
           APP=$(find "$CM_BUILD_DIR/.derived/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' | head -1)
           test -n "$APP"
+          cp "$CM_BUILD_DIR/mobile/ios/App/App/bundle-icons/AppIcon60x60@2x.png" "$APP/"
+          cp "$CM_BUILD_DIR/mobile/ios/App/App/bundle-icons/AppIcon76x76@2x~ipad.png" "$APP/"
           mkdir -p "$CM_BUILD_DIR/Payload"
           cp -R "$APP" "$CM_BUILD_DIR/Payload/"
           cd "$CM_BUILD_DIR"
