@@ -92,10 +92,12 @@ final class MusikeWebViewController: CAPBridgeViewController {
 
     private var appearanceMode = "system"
     private var isPlaying = false
+    private var radioSelected = false
+    private let activeColor = UIColor(red: 0.98, green: 0.14, blue: 0.24, alpha: 1.0)
     private var artworkURL = ""
     private var artworkTask: URLSessionDataTask?
 
-    private let routes = ["/", "/search", "/library"]
+    private let routes = ["/", "__radio__", "/library", "/search"]
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -154,9 +156,9 @@ final class MusikeWebViewController: CAPBridgeViewController {
             tabGlass.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
             tabGlass.heightAnchor.constraint(equalToConstant: 72),
 
-            miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            miniGlass.bottomAnchor.constraint(equalTo: tabGlass.topAnchor, constant: -10),
+            miniGlass.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
+            miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
             miniGlass.heightAnchor.constraint(equalToConstant: 54)
         ])
     }
@@ -177,8 +179,9 @@ final class MusikeWebViewController: CAPBridgeViewController {
 
         let items: [(String, String, String)] = [
             ("house.fill", "Home", "home"),
-            ("magnifyingglass", "Search", "search"),
-            ("music.note.square.stack", "Library", "library")
+            ("dot.radiowaves.left.and.right", "Radio", "radio"),
+            ("music.note.tv", "Library", "library"),
+            ("magnifyingglass", "Search", "search")
         ]
         for (index, item) in items.enumerated() {
             let button = makeTabButton(symbol: item.0, title: item.1, tag: index)
@@ -208,8 +211,8 @@ final class MusikeWebViewController: CAPBridgeViewController {
         for (i, button) in tabButtons.enumerated() {
             var config = button.configuration
             let active = i == index
-            config?.background.backgroundColor = active ? UIColor.systemBlue.withAlphaComponent(0.22) : .clear
-            config?.baseForegroundColor = active ? .systemBlue : .label
+            config?.background.backgroundColor = active ? activeColor.withAlphaComponent(0.18) : .clear
+            config?.baseForegroundColor = active ? activeColor : .label
             button.configuration = config
             button.accessibilityTraits = active ? [.button, .selected] : .button
         }
@@ -321,8 +324,33 @@ final class MusikeWebViewController: CAPBridgeViewController {
     @objc private func tabTapped(_ button: UIButton) {
         let index = button.tag
         guard routes.indices.contains(index) else { return }
+        radioSelected = (index == 1)
         setActiveTab(index)
-        navigate(to: routes[index])
+        if routes[index] == "__radio__" {
+            startRadio()
+        } else {
+            navigate(to: routes[index])
+        }
+    }
+
+    /// Radio is a real app action: open the current track's Now Playing sheet
+    /// and press its existing "Start radio" control. No fake page or state flag.
+    private func startRadio() {
+        let js = #"""
+        (function(){
+          var m = document.querySelector('div.fixed.z-20 > div.glass');
+          if (!m) return;
+          var b = m.querySelector('button');
+          if (b) b.click();
+          setTimeout(function(){
+            var d = document.querySelector('[role=dialog][aria-modal=true]');
+            if (!d) return;
+            var r = d.querySelector('button.glass-thin');
+            if (r) r.click();
+          }, 200);
+        })();
+        """#
+        webView?.evaluateJavaScript(js)
     }
 
     private func navigate(to route: String) {
@@ -331,7 +359,8 @@ final class MusikeWebViewController: CAPBridgeViewController {
     }
 
     func setRoute(_ path: String) {
-        if path.hasPrefix("/search") { setActiveTab(1) }
+        if radioSelected && (path == "/" || path.isEmpty) { return }
+        if path.hasPrefix("/search") { setActiveTab(3) }
         else if path.hasPrefix("/library") { setActiveTab(2) }
         else { setActiveTab(0) }
     }
