@@ -73,16 +73,15 @@ final class GlassPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
 /// Your original Capacitor wrapper plus real iOS 27 Liquid Glass chrome.
 /// No web assets, icons, plist keys, routes or app logic are changed.
-final class MusikeWebViewController: CAPBridgeViewController {
+final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     private let playback = MusikePlayback()
     private let youtube = MusikeYouTube()
     private let audio = MusikeAudio()
     private let appearanceHandler = AppearanceHandler()
     private let routeHandler = RouteHandler()
 
-    private let tabGlass = UIVisualEffectView(frame: .zero)
+    private let tabBar = UITabBar(frame: .zero)
     private let miniGlass = UIVisualEffectView(frame: .zero)
-    private var tabButtons: [UIButton] = []
     private let miniArtwork = UIImageView()
     private let miniTitle = UILabel()
     private let miniArtist = UILabel()
@@ -134,88 +133,70 @@ final class MusikeWebViewController: CAPBridgeViewController {
     }
 
     private func installGlassChrome() {
-        tabGlass.effect = liquidGlassEffect()
         miniGlass.effect = liquidGlassEffect()
-        tabGlass.layer.cornerRadius = 26
         miniGlass.layer.cornerRadius = 18
-        tabGlass.layer.masksToBounds = true
         miniGlass.layer.masksToBounds = true
-        tabGlass.translatesAutoresizingMaskIntoConstraints = false
         miniGlass.translatesAutoresizingMaskIntoConstraints = false
+
+        // A real UITabBar linked with the Xcode 27 SDK gets Apple's automatic
+        // Liquid Glass material. Do not override it with a custom effect.
+        tabBar.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.delegate = self
+        tabBar.isTranslucent = true
+        tabBar.backgroundColor = .clear
+        tabBar.layer.cornerRadius = 26
+        tabBar.layer.masksToBounds = true
+        tabBar.tintColor = activeColor
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithTransparentBackground()
+        tabBar.standardAppearance = tabAppearance
+        tabBar.scrollEdgeAppearance = tabAppearance
 
         buildTabBar()
         buildMiniPlayer()
 
-        view.addSubview(tabGlass)
+        view.addSubview(tabBar)
         view.addSubview(miniGlass)
 
         let guide = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
-            tabGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            tabGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            tabGlass.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
-            tabGlass.heightAnchor.constraint(equalToConstant: 72),
+            tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
+            tabBar.heightAnchor.constraint(equalToConstant: 72),
 
             miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            miniGlass.bottomAnchor.constraint(equalTo: tabGlass.topAnchor, constant: -10),
+            miniGlass.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -10),
             miniGlass.heightAnchor.constraint(equalToConstant: 54)
         ])
     }
 
     private func buildTabBar() {
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        stack.distribution = .fillEqually
-        stack.alignment = .fill
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        tabGlass.contentView.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: tabGlass.contentView.topAnchor, constant: 4),
-            stack.leadingAnchor.constraint(equalTo: tabGlass.contentView.leadingAnchor, constant: 4),
-            stack.trailingAnchor.constraint(equalTo: tabGlass.contentView.trailingAnchor, constant: -4),
-            stack.bottomAnchor.constraint(equalTo: tabGlass.contentView.bottomAnchor, constant: -4)
-        ])
-
-        let items: [(String, String, String)] = [
-            ("house.fill", "Home", "home"),
-            ("dot.radiowaves.left.and.right", "Radio", "radio"),
-            ("music.note.tv", "Library", "library"),
-            ("magnifyingglass", "Search", "search")
+        let items: [(String, String, String, String)] = [
+            ("house", "house.fill", "Home", "home"),
+            ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
+            ("music.note.tv", "music.note.tv", "Library", "library"),
+            ("magnifyingglass", "magnifyingglass", "Search", "search")
         ]
-        for (index, item) in items.enumerated() {
-            let button = makeTabButton(symbol: item.0, title: item.1, tag: index)
-            button.accessibilityIdentifier = "glass-tab-\(item.2)"
-            tabButtons.append(button)
-            stack.addArrangedSubview(button)
+        var tabItems: [UITabBarItem] = []
+        for item in items {
+            let tabItem = UITabBarItem(
+                title: item.2,
+                image: UIImage(systemName: item.0),
+                selectedImage: UIImage(systemName: item.1)
+            )
+            tabItem.tag = tabItems.count
+            tabItem.accessibilityIdentifier = "glass-tab-\(item.3)"
+            tabItems.append(tabItem)
         }
+        tabBar.items = tabItems
         setActiveTab(0)
     }
 
-    private func makeTabButton(symbol: String, title: String, tag: Int) -> UIButton {
-        var config = UIButton.Configuration.plain()
-        config.image = UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .regular))
-        config.title = title
-        config.imagePlacement = .top
-        config.imagePadding = 4
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 4, bottom: 4, trailing: 4)
-        config.background.cornerRadius = 20
-        let button = UIButton(configuration: config)
-        button.tag = tag
-        button.tintColor = .label
-        button.addTarget(self, action: #selector(tabTapped(_:)), for: .touchUpInside)
-        return button
-    }
-
     private func setActiveTab(_ index: Int) {
-        for (i, button) in tabButtons.enumerated() {
-            var config = button.configuration
-            let active = i == index
-            config?.background.backgroundColor = active ? activeColor.withAlphaComponent(0.18) : .clear
-            config?.baseForegroundColor = active ? activeColor : .label
-            button.configuration = config
-            button.accessibilityTraits = active ? [.button, .selected] : .button
-        }
+        guard let items = tabBar.items, items.indices.contains(index) else { return }
+        tabBar.selectedItem = items[index]
     }
 
     private func buildMiniPlayer() {
@@ -282,7 +263,7 @@ final class MusikeWebViewController: CAPBridgeViewController {
 
     private func installBridgeScript() {
         let css = """
-        nav[aria-label="Main navigation"] { display: none !important; }
+        nav.fixed.inset-x-3[class*="bottom-[calc(10px"] { display: none !important; }
         div.fixed.inset-x-3[class*="bottom-[calc(84px"] { display: none !important; }
         main { padding-bottom: 160px !important; }
         """
@@ -321,11 +302,10 @@ final class MusikeWebViewController: CAPBridgeViewController {
         return String(text.dropFirst().dropLast())
     }
 
-    @objc private func tabTapped(_ button: UIButton) {
-        let index = button.tag
+    func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+        let index = item.tag
         guard routes.indices.contains(index) else { return }
         radioSelected = (index == 1)
-        setActiveTab(index)
         if routes[index] == "__radio__" {
             startRadio()
         } else {
@@ -382,7 +362,7 @@ final class MusikeWebViewController: CAPBridgeViewController {
 
     func setGlassEnabled(_ enabled: Bool) {
         miniGlass.isHidden = !enabled
-        tabGlass.isHidden = !enabled
+        tabBar.isHidden = !enabled
         if !enabled {
             miniTitle.text = "Not Playing"
             miniArtist.text = ""
