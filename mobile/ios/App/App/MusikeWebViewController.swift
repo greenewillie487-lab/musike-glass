@@ -29,6 +29,24 @@ private final class RouteHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+/// Fetches Apple's public chart feed natively so the web bundle is not blocked by CORS.
+private final class LiveFeedHandler: NSObject, WKScriptMessageHandler {
+    weak var controller: MusikeWebViewController?
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any],
+              let id = body["id"] as? String,
+              let urlString = body["url"] as? String,
+              let url = URL(string: urlString),
+              url.host == "rss.marketingtools.apple.com" else { return }
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self, let data,
+                  let json = String(data: data, encoding: .utf8) else { return }
+            DispatchQueue.main.async { self.controller?.deliverLiveFeed(id: id, json: json) }
+        }.resume()
+    }
+}
+
 /// Restores the original GlassPlayer bridge. The web bundle already calls these four
 /// methods; nothing in the web app is modified to make this work.
 @objc(GlassPlayerPlugin)
@@ -79,6 +97,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     private let audio = MusikeAudio()
     private let appearanceHandler = AppearanceHandler()
     private let routeHandler = RouteHandler()
+    private let liveFeedHandler = LiveFeedHandler()
 
     private let tabBar = UITabBar(frame: .zero)
     private let miniGlass = UIVisualEffectView(frame: .zero)
@@ -88,6 +107,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     private let playButton = UIButton(type: .system)
     private let nextButton = UIButton(type: .system)
     private let progressBar = UIView()
+    private var progressWidthConstraint: NSLayoutConstraint?
 
     private var appearanceMode = "system"
     private var isPlaying = false
@@ -108,8 +128,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         webView?.configuration.userContentController.add(audio, name: "musikeAudio")
         webView?.configuration.userContentController.add(appearanceHandler, name: "musikeAppearance")
         webView?.configuration.userContentController.add(routeHandler, name: "musikeRoute")
+        webView?.configuration.userContentController.add(liveFeedHandler, name: "musikeLive")
         appearanceHandler.controller = self
         routeHandler.controller = self
+        liveFeedHandler.controller = self
         playback.attach(webView)
         youtube.attach(webView)
         audio.attach(webView)
@@ -206,8 +228,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         NSLayoutConstraint.activate([
             progressBar.topAnchor.constraint(equalTo: miniGlass.contentView.topAnchor),
             progressBar.leadingAnchor.constraint(equalTo: miniGlass.contentView.leadingAnchor),
-            progressBar.heightAnchor.constraint(equalToConstant: 2),
-            progressBar.widthAnchor.constraint(equalToConstant: 0)
+            progressBar.heightAnchor.constraint(equalToConstant: 2)
         ])
 
         miniArtwork.image = UIImage(systemName: "music.note")
@@ -246,6 +267,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         miniGlass.contentView.addSubview(stack)
+        let widthConstraint = progressBar.widthAnchor.constraint(equalToConstant: 0)
+        widthConstraint.isActive = true
+        progressWidthConstraint = widthConstraint
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: miniGlass.contentView.topAnchor, constant: 5),
             stack.leadingAnchor.constraint(equalTo: miniGlass.contentView.leadingAnchor, constant: 12),
@@ -294,6 +318,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         let script = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         webView?.configuration.userContentController.addUserScript(script)
         webView?.evaluateJavaScript(source)
+    }
+
+    func deliverLiveFeed(id: String, json: String) {
+        let js = "window.__musikeLiveResult && window.__musikeLiveResult(\(jsString(id)), \(jsString(json)));"
+        webView?.evaluateJavaScript(js)
     }
 
     private func jsString(_ value: String) -> String {
@@ -388,7 +417,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     private func setProgress(_ value: Double) {
         let clamped = max(0, min(1, value))
         let width = miniGlass.contentView.bounds.width * CGFloat(clamped)
-        progressBar.widthAnchor.constraint(equalToConstant: width).isActive = true
+        progressWidthConstraint?.constant = width
         progressBar.superview?.layoutIfNeeded()
     }
 
