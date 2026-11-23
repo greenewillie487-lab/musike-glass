@@ -12,6 +12,15 @@ workflows:
     scripts:
       - name: Install JS dependencies
         script: npx -y pnpm@10.15.0 install --frozen-lockfile
+      - name: Stage Capacitor plugin sources
+        script: |
+          mkdir -p "$CM_BUILD_DIR/ios-plugins"
+          for p in app filesystem keyboard share; do
+            SRC=$(find "$CM_BUILD_DIR/node_modules/.pnpm" -maxdepth 6 -type d -path "*@capacitor+$p@*/node_modules/@capacitor/$p" | head -1)
+            test -n "$SRC"
+            DST="$CM_BUILD_DIR/ios-plugins/Capacitor$(echo "$p" | tr '[:lower:]' '[:upper:]' | cut -c1)$(echo "$p" | cut -c2-)"
+            cp -R "$SRC" "$DST"
+          done
       - name: Build unsigned app
         script: |
           xcodebuild \
