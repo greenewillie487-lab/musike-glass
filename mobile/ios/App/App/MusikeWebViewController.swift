@@ -156,9 +156,9 @@ final class MusikeWebViewController: CAPBridgeViewController {
             tabGlass.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
             tabGlass.heightAnchor.constraint(equalToConstant: 72),
 
-            miniGlass.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
-            miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            miniGlass.bottomAnchor.constraint(equalTo: tabGlass.topAnchor, constant: -10),
             miniGlass.heightAnchor.constraint(equalToConstant: 54)
         ])
     }
