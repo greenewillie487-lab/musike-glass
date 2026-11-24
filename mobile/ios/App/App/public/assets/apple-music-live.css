@@ -94,3 +94,13 @@ main:has(#musike-live-home) > div.pb-8 > div.glass-thin[class*="rounded-[20px]"]
   cursor: pointer;
 }
 .am-live-genre:active { color: var(--fg); background: var(--surface-3); }
+
+/* Remove the red focus ring around the search field. */
+input[type="search"],
+input[type="search"]:focus,
+input[type="search"]:focus-visible {
+  border-color: var(--line-strong) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+

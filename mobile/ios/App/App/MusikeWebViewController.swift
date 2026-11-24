@@ -390,28 +390,37 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     // MARK: - GlassPlayer plugin calls
 
     func setGlassEnabled(_ enabled: Bool) {
-        miniGlass.isHidden = !enabled
-        tabBar.isHidden = !enabled
-        if !enabled {
-            miniTitle.text = "Not Playing"
-            miniArtist.text = ""
-            setProgress(0)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.miniGlass.isHidden = !enabled
+            self.tabBar.isHidden = !enabled
+            if !enabled {
+                self.miniTitle.text = "Not Playing"
+                self.miniArtist.text = ""
+                self.setProgress(0)
+            }
         }
     }
 
     func setTrack(title: String?, artist: String?, artwork link: String?, duration: Double) {
-        let name = (title?.isEmpty == false ? title : "Not Playing") ?? "Not Playing"
-        miniTitle.text = name
-        miniArtist.text = (artist?.isEmpty == false ? artist : nil)
-        setProgress(0)
-        loadArtwork(link)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let name = (title?.isEmpty == false ? title : "Not Playing") ?? "Not Playing"
+            self.miniTitle.text = name
+            self.miniArtist.text = (artist?.isEmpty == false ? artist : nil)
+            self.setProgress(0)
+            self.loadArtwork(link)
+        }
     }
 
     func setPlaying(playing: Bool, progress: Double) {
-        isPlaying = playing
-        playButton.setImage(UIImage(systemName: playing ? "pause.fill" : "play.fill"), for: .normal)
-        playButton.accessibilityLabel = playing ? "Pause" : "Play"
-        setProgress(progress)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isPlaying = playing
+            self.playButton.setImage(UIImage(systemName: playing ? "pause.fill" : "play.fill"), for: .normal)
+            self.playButton.accessibilityLabel = playing ? "Pause" : "Play"
+            self.setProgress(progress)
+        }
     }
 
     private func setProgress(_ value: Double) {

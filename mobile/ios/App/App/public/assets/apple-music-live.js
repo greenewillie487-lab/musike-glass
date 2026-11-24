@@ -1,130 +1,112 @@
-/* apple-music-live.js — live Home shelves from Apple's public chart feed.
-   No random data. Recommendations come from the app's real listening history. */
+/* Live Home + Genres for the original Musike bundle. No random data. */
 (function () {
   "use strict";
 
-  var FEED_ROOT = "https://rss.marketingtools.apple.com/api/v2/";
-  var CACHE_KEY = "musike:live-charts-v1";
-  var WRAPPER_ID = "musike-live-home";
-  var store = "us";
+  var HOME_ID = "musike-live-home";
+  var GENRE_ID = "musike-live-genres";
+  var SNAPSHOT = "/assets/apple-charts.json";
+  var FEED = "https://rss.marketingtools.apple.com/api/v2/gh/music/most-played/100/songs.json";
+  var CACHE = "musike:apple-charts-v3";
+  var results = [];
+  var requested = false;
 
-  try {
-    var lang = (navigator.language || "en-US").toLowerCase();
-    if (lang.indexOf("gh") >= 0 || lang.indexOf("en-gh") >= 0) store = "gh";
-  } catch (e) {}
-
-  function feedURL() {
-    return FEED_ROOT + store + "/music/most-played/100/songs.json";
+  function seed(data) {
+    var items = data && data.feed && data.feed.results;
+    if (!Array.isArray(items) || !items.length) return;
+    results = items;
+    try { localStorage.setItem(CACHE, JSON.stringify({ at: Date.now(), items: items })); } catch (e) {}
+    render();
   }
 
-  function listeningEvents() {
-    try { return JSON.parse(localStorage.getItem("musike:listening-events") || "[]"); }
-    catch (e) { return []; }
+  function load() {
+    if (requested) return;
+    requested = true;
+    try {
+      var saved = JSON.parse(localStorage.getItem(CACHE) || "null");
+      if (saved && Array.isArray(saved.items) && saved.items.length) {
+        results = saved.items;
+        render();
+      }
+    } catch (e) {}
+
+    // Same-origin bundled snapshot guarantees Home works offline / without CORS.
+    fetch(SNAPSHOT).then(function (r) { return r.json(); }).then(seed).catch(function () {});
+
+    // Attempt a true live refresh cross-origin; keep snapshot if blocked.
+    fetch(FEED).then(function (r) {
+      if (!r.ok) throw Error("HTTP " + r.status);
+      return r.json();
+    }).then(seed).catch(function () {});
   }
 
-  function artistScores() {
+  function listeningScores() {
     var scores = Object.create(null);
-    var events = listeningEvents();
-    for (var i = 0; i < events.length; i++) {
-      var e = events[i] || {};
-      var name = String(e.artist || "").split(",")[0].trim().toLowerCase();
-      if (!name) continue;
-      var weight = 1;
-      if (e.type === "track_favorited") weight = 5;
-      else if (e.type === "track_replayed") weight = 3;
-      else if (e.type === "track_completed") weight = 2;
-      else if (e.type === "track_skipped") weight = -1;
-      if (typeof e.completion === "number") weight *= Math.max(0.1, e.completion);
-      scores[name] = (scores[name] || 0) + weight;
-    }
+    try {
+      var events = JSON.parse(localStorage.getItem("musike:listening-events") || "[]");
+      for (var i = 0; i < events.length; i++) {
+        var e = events[i] || {};
+        var artist = String(e.artist || "").split(",")[0].trim().toLowerCase();
+        if (!artist) continue;
+        var w = 1;
+        if (e.type === "track_favorited") w = 5;
+        else if (e.type === "track_replayed") w = 3;
+        else if (e.type === "track_completed") w = 2;
+        else if (e.type === "track_skipped") w = -1;
+        scores[artist] = (scores[artist] || 0) + w;
+      }
+    } catch (e) {}
     return scores;
   }
 
-  function cachedFeed() {
-    try {
-      var raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      var parsed = JSON.parse(raw);
-      if (Date.now() - parsed.at > 15 * 60 * 1000) return null;
-      return parsed.data;
-    } catch (e) { return null; }
-  }
-
-  function loadFeed(force) {
-    var cached = cachedFeed();
-    if (!force && cached) { render(cached.results || []); return; }
-
-    var id = "live-" + Date.now();
-    window.__musikeLiveResult = function (resultId, json) {
-      if (resultId !== id) return;
-      try {
-        var data = JSON.parse(json);
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: data }));
-        render((data.feed && data.feed.results) || []);
-      } catch (e) {}
-    };
-
-    var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeLive;
-    if (handler) {
-      handler.postMessage({ id: id, url: feedURL() });
-    } else if (window.fetch) {
-      fetch(feedURL()).then(function (r) { return r.json(); }).then(function (data) {
-        window.__musikeLiveResult(id, JSON.stringify(data));
-      }).catch(function () {});
-    }
+  function navigate(query, type) {
+    var q = encodeURIComponent(query);
+    var url = "/search?q=" + q + (type ? "&type=" + type : "");
+    history.pushState({}, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
   function section(title, items) {
     var wrap = document.createElement("section");
     wrap.className = "am-live-section";
-    var heading = document.createElement("h2");
-    heading.className = "am-live-heading";
-    heading.textContent = title;
-    wrap.appendChild(heading);
+    var h = document.createElement("h2");
+    h.className = "am-live-heading";
+    h.textContent = title;
+    wrap.appendChild(h);
 
     var list = document.createElement("ul");
     list.className = "am-live-shelf";
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       var li = document.createElement("li");
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "am-live-card";
-      button.setAttribute("aria-label", "Search for " + item.name + " by " + item.artistName);
-
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "am-live-card";
+      b.setAttribute("aria-label", "Search for " + (item.name || "") + " by " + (item.artistName || ""));
       var img = document.createElement("img");
-      img.src = String(item.artworkUrl100 || "").replace(/100x100bb/, "400x400bb");
+      if (item.artworkUrl100) img.src = String(item.artworkUrl100).replace(/100x100bb/, "400x400bb");
       img.alt = "";
       img.loading = "lazy";
-
       var name = document.createElement("span");
       name.className = "am-live-title";
       name.textContent = item.name || "";
       var artist = document.createElement("span");
       artist.className = "am-live-artist";
       artist.textContent = item.artistName || "";
-
-      button.appendChild(img);
-      button.appendChild(name);
-      button.appendChild(artist);
-      button.addEventListener("click", (function (n, a) {
-        return function () {
-          var q = encodeURIComponent(n + " " + a);
-          history.pushState({}, "", "/search?q=" + q);
-          window.dispatchEvent(new PopStateEvent("popstate"));
-        };
+      b.appendChild(img); b.appendChild(name); b.appendChild(artist);
+      b.addEventListener("click", (function (n, a) {
+        return function () { navigate((n + " " + a).trim(), "song"); };
       })(item.name || "", item.artistName || ""));
-
-      li.appendChild(button);
+      li.appendChild(b);
       list.appendChild(li);
     }
     wrap.appendChild(list);
     return wrap;
   }
 
-  function renderGenres(results) {
-    var existing = document.getElementById("musike-live-genres");
-    if (existing) existing.remove();
+  function renderGenres() {
+    var old = document.getElementById(GENRE_ID);
+    if (old) old.remove();
+    if (location.pathname.indexOf("/search") !== 0 || !results.length) return;
     var counts = Object.create(null);
     for (var i = 0; i < results.length; i++) {
       var genres = (results[i] && results[i].genres) || [];
@@ -134,11 +116,10 @@
       }
     }
     var names = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 14);
-    if (!names.length) return;
     var form = document.querySelector('main form[role="search"]');
-    if (!form || !form.parentNode) return;
+    if (!names.length || !form || !form.parentNode) return;
     var row = document.createElement("div");
-    row.id = "musike-live-genres";
+    row.id = GENRE_ID;
     row.className = "am-live-genres";
     for (var k = 0; k < names.length; k++) {
       var chip = document.createElement("button");
@@ -146,33 +127,27 @@
       chip.className = "am-live-genre";
       chip.textContent = names[k];
       chip.addEventListener("click", (function (name) {
-        return function () {
-          history.pushState({}, "", "/search?q=" + encodeURIComponent(name) + "&type=song");
-          window.dispatchEvent(new PopStateEvent("popstate"));
-        };
+        return function () { navigate(name, "song"); };
       })(names[k]));
       row.appendChild(chip);
     }
     form.parentNode.insertBefore(row, form.nextSibling);
   }
 
-  function render(results) {
-    if (location.pathname === "/search") { renderGenres(results); return; }
-    if (location.pathname !== "/" || !results.length) return;
+  function render() {
     var main = document.querySelector("main");
+    var home = location.pathname === "/";
     if (!main) return;
 
-    var old = document.getElementById(WRAPPER_ID);
+    var old = document.getElementById(HOME_ID);
     if (old) old.remove();
+    renderGenres();
+    if (!home || !results.length) return;
 
-    var root = document.createElement("div");
-    root.id = WRAPPER_ID;
-    root.className = "am-live-home";
-
-    var scores = artistScores();
+    var scores = listeningScores();
     var recommended = results.filter(function (item) {
-      var artist = String(item.artistName || "").split(",")[0].trim().toLowerCase();
-      return artist && scores[artist] > 0;
+      var a = String(item.artistName || "").split(",")[0].trim().toLowerCase();
+      return a && scores[a] > 0;
     }).sort(function (a, b) {
       var aa = String(a.artistName || "").split(",")[0].trim().toLowerCase();
       var bb = String(b.artistName || "").split(",")[0].trim().toLowerCase();
@@ -184,31 +159,23 @@
       return String(b.releaseDate || "").localeCompare(String(a.releaseDate || ""));
     }).slice(0, 20);
 
+    var root = document.createElement("div");
+    root.id = HOME_ID;
+    root.className = "am-live-home";
     root.appendChild(section("Made for You", recommended));
     root.appendChild(section("New Releases", newer));
     root.appendChild(section("Top Charts", results.slice(0, 30)));
     main.appendChild(root);
   }
 
-  function ensure() {
-    var onHome = location.pathname === "/";
-    var onSearch = location.pathname.indexOf("/search") === 0;
-    if (!onHome && !onSearch) {
-      var old = document.getElementById(WRAPPER_ID);
-      if (old) old.remove();
-      var genres = document.getElementById("musike-live-genres");
-      if (genres) genres.remove();
-      return;
-    }
-    if (onHome && !document.getElementById(WRAPPER_ID)) loadFeed(false);
-    else if (onSearch) loadFeed(false);
+  function schedule() {
+    if (location.pathname === "/" || location.pathname.indexOf("/search") === 0) load();
+    render();
   }
 
   var push = history.pushState;
-  history.pushState = function () { var r = push.apply(this, arguments); ensure(); return r; };
-  var replace = history.replaceState;
-  history.replaceState = function () { var r = replace.apply(this, arguments); ensure(); return r; };
-  window.addEventListener("popstate", ensure);
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ensure);
-  else ensure();
+  history.pushState = function () { var r = push.apply(this, arguments); schedule(); return r; };
+  window.addEventListener("popstate", schedule);
+  document.addEventListener("DOMContentLoaded", schedule);
+  if (document.readyState !== "loading") schedule();
 })();
