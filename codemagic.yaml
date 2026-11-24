@@ -95,7 +95,7 @@ workflows:
           test -n "$APP"
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" app.musike.ios || true
-          sleep 18
+          sleep 45
           xcrun simctl io "$UDID" screenshot "$CM_BUILD_DIR/native-glass-preview.png"
     artifacts:
       - $CM_BUILD_DIR/native-glass-preview.png
