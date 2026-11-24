@@ -16,13 +16,6 @@
     results = items;
     try { localStorage.setItem(CACHE, JSON.stringify({ at: Date.now(), items: items })); } catch (e) {}
     render();
-    setTimeout(function(){
-      var o = document.getElementById(HOME_ID);
-      if (o && (!o.parentElement || !o.parentElement.classList.contains('pb-8'))) {
-        o.remove();
-        render();
-      }
-    }, 1200);
   }
 
   function load() {
@@ -156,8 +149,9 @@
       if (old) old.remove();
       return;
     }
+    var hasTarget = !!main.querySelector('div.pb-8 > div.glass-thin');
     var correctlyPlaced = old && old.parentElement &&
-      old.parentElement.classList.contains('pb-8');
+      (old.parentElement.classList.contains('pb-8') || !hasTarget);
     if (old && old.dataset.stamp === stamp && correctlyPlaced) return;
     if (old) old.remove();
 
