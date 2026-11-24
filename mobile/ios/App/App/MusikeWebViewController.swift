@@ -107,8 +107,9 @@ final class GlassPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func enable(_ call: CAPPluginCall) {
-        NativeGlass.shared.host?.setGlassEnabled(true)
-        call.resolve()
+        // Native chrome is always visible. Rejecting keeps the web mini-player
+        // mounted (hidden by CSS) so native taps can use its real React handlers.
+        call.reject("native-chrome-owned")
     }
 
     @objc func disable(_ call: CAPPluginCall) {
@@ -520,8 +521,23 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         if routes[index] == "__radio__" {
             startRadio()
         } else {
-            navigate(to: routes[index])
+            tapWebTab(routes[index])
         }
+    }
+
+    private func tapWebTab(_ route: String) {
+        let js = """
+        (function(){
+          var nav = document.querySelector('nav.fixed.inset-x-3[class*="bottom-[calc(10px"]');
+          if (nav) {
+            var link = nav.querySelector('a[href=\"\(route)\"]');
+            if (link) { link.click(); return; }
+          }
+          history.pushState({}, '', \(jsString(route)));
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        })();
+        """
+        webView?.evaluateJavaScript(js)
     }
 
     /// Radio is a real app action: open the current track's Now Playing sheet
@@ -562,18 +578,48 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         webView?.evaluateJavaScript("(function(){var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.musikeRoute;if(h)h.postMessage((location.pathname||'/')+(location.search||'')+(location.hash||''));})();")
     }
 
+    private func tapWebMiniButton(_ index: Int, fallbackAction: String? = nil) {
+        let fallback = fallbackAction.map { "window.__musikeMediaAction && window.__musikeMediaAction('\($0)');" } ?? ""
+        let js = """
+        (function(){
+          var m = document.querySelector('div.fixed.inset-x-3[class*="bottom-[calc(84px"]');
+          if (m) {
+            var b = m.querySelectorAll('button');
+            if (b.length > \(index)) { b[\(index)].click(); return; }
+          }
+          \(fallback)
+        })();
+        """
+        webView?.evaluateJavaScript(js)
+    }
+
+    @objc private func openNowPlaying() { tapWebMiniButton(0) }
+    @objc private func playTapped() { tapWebMiniButton(1, fallbackAction: isPlaying ? "pause" : "play") }
+    @objc private func nextTapped() { tapWebMiniButton(2, fallbackAction: "next") }
+    @objc private func previousTapped() { tapWebMiniButton(0, fallbackAction: "previous") }
+
+    @objc private func closeSheetTapped() { sendCommand("closeNowPlaying") }
+    @objc private func lyricsTapped() { tapSheetTab(1, fallback: "lyrics") }
+    @objc private func queueTapped() { tapSheetTab(2, fallback: "queue") }
+
+    private func tapSheetTab(_ index: Int, fallback: String) {
+        let js = """
+        (function(){
+          var d = document.querySelector('[role=dialog][aria-modal=true]');
+          if (d) {
+            var t = d.querySelectorAll('[role=tablist] [role=tab]');
+            if (t.length > \(index)) { t[\(index)].click(); return; }
+          }
+          window.__musikeBridgeCommand && window.__musikeBridgeCommand('selectTab', '\(fallback)');
+        })();
+        """
+        webView?.evaluateJavaScript(js)
+    }
+
     private func sendCommand(_ action: String, value: String? = nil) {
         let valueJS = value.map { jsString($0) } ?? "null"
         webView?.evaluateJavaScript("window.__musikeBridgeCommand && window.__musikeBridgeCommand(\(jsString(action)), \(valueJS));")
     }
-
-    @objc private func openNowPlaying() { sendCommand("openNowPlaying") }
-    @objc private func closeSheetTapped() { sendCommand("closeNowPlaying") }
-    @objc private func lyricsTapped() { sendCommand("selectTab", value: "lyrics") }
-    @objc private func queueTapped() { sendCommand("selectTab", value: "queue") }
-    @objc private func playTapped() { sendCommand("toggle") }
-    @objc private func nextTapped() { sendCommand("next") }
-    @objc private func previousTapped() { sendCommand("previous") }
 
     func applyWebState(playing: Bool, progress: Double) {
         isPlaying = playing
