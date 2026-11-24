@@ -630,7 +630,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
 
     func applyWebUI(sheetOpen: Bool, activeTab: String) {
         isSheetOpen = sheetOpen
-        sheetBar.isHidden = !sheetOpen
+        // The web Now Playing screen already has its own header; never add a second bar.
+        sheetBar.isHidden = true
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
         lyricsButton.tintColor = activeTab == "lyrics" ? activeColor : .label

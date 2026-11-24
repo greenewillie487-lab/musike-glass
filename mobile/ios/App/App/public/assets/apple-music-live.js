@@ -16,6 +16,13 @@
     results = items;
     try { localStorage.setItem(CACHE, JSON.stringify({ at: Date.now(), items: items })); } catch (e) {}
     render();
+    setTimeout(function(){
+      var o = document.getElementById(HOME_ID);
+      if (o && (!o.parentElement || !o.parentElement.classList.contains('pb-8'))) {
+        o.remove();
+        render();
+      }
+    }, 1200);
   }
 
   function load() {
@@ -149,7 +156,9 @@
       if (old) old.remove();
       return;
     }
-    if (old && old.dataset.stamp === stamp) return;
+    var correctlyPlaced = old && old.parentElement &&
+      old.parentElement.classList.contains('pb-8');
+    if (old && old.dataset.stamp === stamp && correctlyPlaced) return;
     if (old) old.remove();
 
     var scores = listeningScores();
@@ -174,7 +183,9 @@
     root.appendChild(section("Made for You", recommended));
     root.appendChild(section("New Releases", newer));
     root.appendChild(section("Top Charts", results.slice(0, 30)));
-    main.appendChild(root);
+    var target = main.querySelector('div.pb-8 > div.glass-thin') ||
+                 main.querySelector('div.glass-thin[class*="rounded-[20px]"]');
+    if (target) target.replaceWith(root); else main.appendChild(root);
   }
 
   function schedule() {
