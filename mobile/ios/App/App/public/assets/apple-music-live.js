@@ -105,6 +105,8 @@
 
   function renderGenres() {
     var old = document.getElementById(GENRE_ID);
+    var genreStamp = results.length + ":" + location.pathname;
+    if (old && old.dataset.stamp === genreStamp) return;
     if (old) old.remove();
     if (location.pathname.indexOf("/search") !== 0 || !results.length) return;
     var counts = Object.create(null);
@@ -121,6 +123,7 @@
     var row = document.createElement("div");
     row.id = GENRE_ID;
     row.className = "am-live-genres";
+    row.dataset.stamp = genreStamp;
     for (var k = 0; k < names.length; k++) {
       var chip = document.createElement("button");
       chip.type = "button";
@@ -139,10 +142,15 @@
     var home = location.pathname === "/";
     if (!main) return;
 
+    var stamp = location.pathname + ":" + results.length;
     var old = document.getElementById(HOME_ID);
-    if (old) old.remove();
     renderGenres();
-    if (!home || !results.length) return;
+    if (!home || !results.length) {
+      if (old) old.remove();
+      return;
+    }
+    if (old && old.dataset.stamp === stamp) return;
+    if (old) old.remove();
 
     var scores = listeningScores();
     var recommended = results.filter(function (item) {
@@ -162,6 +170,7 @@
     var root = document.createElement("div");
     root.id = HOME_ID;
     root.className = "am-live-home";
+    root.dataset.stamp = stamp;
     root.appendChild(section("Made for You", recommended));
     root.appendChild(section("New Releases", newer));
     root.appendChild(section("Top Charts", results.slice(0, 30)));
@@ -178,4 +187,10 @@
   window.addEventListener("popstate", schedule);
   document.addEventListener("DOMContentLoaded", schedule);
   if (document.readyState !== "loading") schedule();
+  var queued = false;
+  new MutationObserver(function () {
+    if (queued) return;
+    queued = true;
+    queueMicrotask(function () { queued = false; schedule(); });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 })();

@@ -244,7 +244,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         miniTitle.textColor = .label
         miniArtist.font = .systemFont(ofSize: 11, weight: .regular)
         miniArtist.textColor = .secondaryLabel
+        miniArtwork.isUserInteractionEnabled = true
+        miniArtwork.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(openNowPlaying)))
         let labels = UIStackView(arrangedSubviews: [miniTitle, miniArtist])
+        labels.isUserInteractionEnabled = true
+        labels.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(openNowPlaying)))
         labels.axis = .vertical
         labels.alignment = .leading
         labels.spacing = 1
@@ -376,6 +380,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
 
     private func postRoute() {
         webView?.evaluateJavaScript("(function(){var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.musikeRoute;if(h)h.postMessage(location.pathname||'/');})();")
+    }
+
+    @objc private func openNowPlaying() {
+        webView?.evaluateJavaScript("location.hash='#now-playing'; window.dispatchEvent(new HashChangeEvent('hashchange')); window.dispatchEvent(new PopStateEvent('popstate'));")
     }
 
     @objc private func playTapped() {
