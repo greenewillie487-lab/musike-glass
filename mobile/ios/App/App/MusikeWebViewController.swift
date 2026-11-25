@@ -113,6 +113,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     private var isPlaying = false
     private var radioSelected = false
     private let activeColor = UIColor(red: 0.98, green: 0.14, blue: 0.24, alpha: 1.0)
+    private let homeScrollView = UIScrollView()
+    private let homeStack = UIStackView()
+    private var chartItems: [[String: Any]] = []
+    private var displayItems: [[String: Any]] = []
+    private var homeVisible = false
     private var artworkURL = ""
     private var artworkTask: URLSessionDataTask?
 
@@ -139,8 +144,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
 
         installBridgeScript()
         installGlassChrome()
+        buildHomeView()
+        fetchCharts()
         applyAppearance()
         postRoute()
+        setRoute("/")
     }
 
     // MARK: - Native Liquid Glass
@@ -177,11 +185,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         buildTabBar()
         buildMiniPlayer()
 
+        view.addSubview(homeScrollView)
         view.addSubview(tabBar)
         view.addSubview(miniGlass)
 
         let guide = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
+            homeScrollView.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
+            homeScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            homeScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            homeScrollView.bottomAnchor.constraint(equalTo: miniGlass.topAnchor, constant: -10),
+
             tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
             tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
             tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
@@ -283,6 +297,170 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         ])
     }
 
+    // MARK: - Native Home shelves (Apple public RSS feed)
+
+    private func buildHomeView() {
+        homeScrollView.translatesAutoresizingMaskIntoConstraints = false
+        homeScrollView.alwaysBounceVertical = true
+        homeScrollView.showsVerticalScrollIndicator = false
+
+        homeStack.axis = .vertical
+        homeStack.spacing = 24
+        homeStack.translatesAutoresizingMaskIntoConstraints = false
+        homeScrollView.addSubview(homeStack)
+        NSLayoutConstraint.activate([
+            homeStack.topAnchor.constraint(equalTo: homeScrollView.topAnchor),
+            homeStack.leadingAnchor.constraint(equalTo: homeScrollView.leadingAnchor),
+            homeStack.trailingAnchor.constraint(equalTo: homeScrollView.trailingAnchor),
+            homeStack.bottomAnchor.constraint(equalTo: homeScrollView.bottomAnchor),
+            homeStack.widthAnchor.constraint(equalTo: homeScrollView.widthAnchor)
+        ])
+
+        let title = UILabel()
+        title.text = "Home"
+        title.font = .systemFont(ofSize: 34, weight: .bold)
+        homeStack.addArrangedSubview(title)
+        homeScrollView.isHidden = true
+    }
+
+    private func fetchCharts() {
+        let urlString = "https://rss.marketingtools.apple.com/api/v2/gh/music/most-played/100/songs.json"
+        func use(_ data: Data) {
+            guard let items = Self.parseChartData(data) else { return }
+            chartItems = items
+            renderHome()
+        }
+        if let cached = UserDefaults.standard.data(forKey: "musike:charts-cache") { use(cached) }
+        guard let url = URL(string: urlString) else { return }
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self, let data, let items = Self.parseChartData(data) else { return }
+            UserDefaults.standard.set(data, forKey: "musike:charts-cache")
+            DispatchQueue.main.async {
+                self.chartItems = items
+                self.renderHome()
+            }
+        }.resume()
+    }
+
+    private static func parseChartData(_ data: Data) -> [[String: Any]]? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let feed = json["feed"] as? [String: Any],
+              let results = feed["results"] as? [[String: Any]] else { return nil }
+        return results
+    }
+
+    private func renderHome() {
+        for view in homeStack.arrangedSubviews {
+            homeStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        displayItems = []
+        let title = UILabel()
+        title.text = "Home"
+        title.font = .systemFont(ofSize: 34, weight: .bold)
+        homeStack.addArrangedSubview(title)
+        guard !chartItems.isEmpty else { return }
+        let newer = chartItems.sorted {
+            String($0["releaseDate"] as? String ?? "") > String($1["releaseDate"] as? String ?? "")
+        }
+        addHomeSection("Made for You", items: Array(chartItems.prefix(20)))
+        addHomeSection("New Releases", items: Array(newer.prefix(20)))
+        addHomeSection("Top Charts", items: Array(chartItems.prefix(30)))
+    }
+
+    private func addHomeSection(_ title: String, items: [[String: Any]]) {
+        let heading = UILabel()
+        heading.text = title
+        heading.font = .systemFont(ofSize: 22, weight: .bold)
+        homeStack.addArrangedSubview(heading)
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 12
+        row.alignment = .top
+        for item in items {
+            let card = makeChartCard(item)
+            displayItems.append(item)
+            card.tag = displayItems.count - 1
+            card.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(chartTapped(_:))))
+            row.addArrangedSubview(card)
+        }
+        let scroller = UIScrollView()
+        scroller.showsHorizontalScrollIndicator = false
+        scroller.translatesAutoresizingMaskIntoConstraints = false
+        scroller.addSubview(row)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: scroller.topAnchor),
+            row.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: scroller.contentLayoutGuide.trailingAnchor),
+            row.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
+            row.heightAnchor.constraint(equalToConstant: 190),
+            scroller.heightAnchor.constraint(equalToConstant: 200)
+        ])
+        homeStack.addArrangedSubview(scroller)
+    }
+
+    private func makeChartCard(_ item: [String: Any]) -> UIView {
+        let card = UIView()
+        card.backgroundColor = .secondarySystemFill
+        card.layer.cornerRadius = 12
+        card.clipsToBounds = true
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.widthAnchor.constraint(equalToConstant: 144).isActive = true
+
+        let art = UIImageView()
+        art.contentMode = .scaleAspectFill
+        art.clipsToBounds = true
+        art.backgroundColor = .tertiarySystemFill
+        art.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(art)
+        NSLayoutConstraint.activate([
+            art.topAnchor.constraint(equalTo: card.topAnchor),
+            art.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            art.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            art.heightAnchor.constraint(equalToConstant: 144)
+        ])
+        if let link = item["artworkUrl100"] as? String, let url = URL(string: link) {
+            URLSession.shared.dataTask(with: url) { data, _, _ in
+                guard let data, let image = UIImage(data: data) else { return }
+                DispatchQueue.main.async { art.image = image }
+            }.resume()
+        }
+
+        let name = UILabel()
+        name.text = item["name"] as? String
+        name.font = .systemFont(ofSize: 13, weight: .semibold)
+        name.numberOfLines = 1
+        let artist = UILabel()
+        artist.text = item["artistName"] as? String
+        artist.font = .systemFont(ofSize: 12)
+        artist.textColor = .secondaryLabel
+        artist.numberOfLines = 1
+        let labels = UIStackView(arrangedSubviews: [name, artist])
+        labels.axis = .vertical
+        labels.spacing = 2
+        labels.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(labels)
+        NSLayoutConstraint.activate([
+            labels.topAnchor.constraint(equalTo: art.bottomAnchor, constant: 8),
+            labels.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 4),
+            labels.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -4)
+        ])
+        return card
+    }
+
+    @objc private func chartTapped(_ recognizer: UITapGestureRecognizer) {
+        guard let index = recognizer.view?.tag, displayItems.indices.contains(index) else { return }
+        let item = displayItems[index]
+        let query = "\(item["name"] as? String ?? "") \(item["artistName"] as? String ?? "")"
+            .trimmingCharacters(in: .whitespaces)
+        homeVisible = false
+        homeScrollView.isHidden = true
+        webView?.isHidden = false
+        navigate(to: "/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&type=song")
+    }
+
     // MARK: - Web bridge
 
     private func installBridgeScript() {
@@ -367,15 +545,25 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         webView?.evaluateJavaScript(js)
     }
 
-    func setRoute(_ path: String) {
-        if radioSelected && (path == "/" || path.isEmpty) { return }
+    func setRoute(_ url: String) {
+        if radioSelected && (url == "/" || url.isEmpty) { return }
+        let clean = url.components(separatedBy: "#").first ?? "/"
+        let path = clean.components(separatedBy: "?").first ?? "/"
+        let sheetOpen = url.contains("#now-playing")
+        homeVisible = path == "/" && !sheetOpen
+        homeScrollView.isHidden = !homeVisible
+        webView?.isHidden = homeVisible
+        tabBar.isHidden = sheetOpen
+        miniGlass.isHidden = sheetOpen
+        if sheetOpen { return }
         if path.hasPrefix("/search") { setActiveTab(3) }
-        else if path.hasPrefix("/library") { setActiveTab(2) }
+        else if path.hasPrefix("/library") || path.hasPrefix("/favorites") ||
+                path.hasPrefix("/history") || path.hasPrefix("/playlist") { setActiveTab(2) }
         else { setActiveTab(0) }
     }
 
     private func postRoute() {
-        webView?.evaluateJavaScript("(function(){var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.musikeRoute;if(h)h.postMessage(location.pathname||'/');})();")
+        webView?.evaluateJavaScript("(function(){var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.musikeRoute;if(h)h.postMessage((location.pathname||'/')+(location.search||'')+(location.hash||''));})();")
     }
 
     @objc private func playTapped() {
