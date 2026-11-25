@@ -301,6 +301,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
 
     private func buildHomeView() {
         homeScrollView.translatesAutoresizingMaskIntoConstraints = false
+        homeScrollView.backgroundColor = .systemBackground
         homeScrollView.alwaysBounceVertical = true
         homeScrollView.showsVerticalScrollIndicator = false
 
@@ -457,7 +458,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
             .trimmingCharacters(in: .whitespaces)
         homeVisible = false
         homeScrollView.isHidden = true
-        webView?.isHidden = false
         navigate(to: "/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&type=song")
     }
 
@@ -552,7 +552,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
-        webView?.isHidden = homeVisible
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
         if sheetOpen { return }
