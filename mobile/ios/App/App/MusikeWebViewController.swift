@@ -404,11 +404,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
 
     private func makeChartCard(_ item: [String: Any]) -> UIView {
         let card = UIView()
-        card.backgroundColor = .secondarySystemFill
+        card.backgroundColor = .systemGray5
         card.layer.cornerRadius = 12
         card.clipsToBounds = true
         card.translatesAutoresizingMaskIntoConstraints = false
         card.widthAnchor.constraint(equalToConstant: 144).isActive = true
+        card.heightAnchor.constraint(equalToConstant: 190).isActive = true
 
         let art = UIImageView()
         art.contentMode = .scaleAspectFill
