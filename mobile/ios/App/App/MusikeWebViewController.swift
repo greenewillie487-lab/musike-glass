@@ -91,7 +91,7 @@ final class GlassPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
 /// Your original Capacitor wrapper plus real iOS 27 Liquid Glass chrome.
 /// No web assets, icons, plist keys, routes or app logic are changed.
-final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
+final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, UIGestureRecognizerDelegate {
     private let playback = MusikePlayback()
     private let youtube = MusikeYouTube()
     private let audio = MusikeAudio()
