@@ -118,6 +118,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
     private var chartItems: [[String: Any]] = []
     private var displayItems: [[String: Any]] = []
     private var homeVisible = false
+    private var currentPath = "/"
     private var artworkURL = ""
     private var artworkTask: URLSessionDataTask?
 
@@ -281,6 +282,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         miniGlass.contentView.addSubview(stack)
+        let miniTap = UITapGestureRecognizer(target: self, action: #selector(openNowPlaying))
+        miniTap.delegate = self
+        miniTap.cancelsTouchesInView = false
+        miniGlass.addGestureRecognizer(miniTap)
         let widthConstraint = progressBar.widthAnchor.constraint(equalToConstant: 0)
         widthConstraint.isActive = true
         progressWidthConstraint = widthConstraint
@@ -550,6 +555,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         if radioSelected && (url == "/" || url.isEmpty) { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
+        currentPath = path
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
@@ -575,6 +581,32 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
         webView?.evaluateJavaScript("window.__musikeMediaAction && window.__musikeMediaAction('next');")
     }
 
+    @objc private func openNowPlaying() {
+        let js = """
+        (function(){
+          var h = window.webkit && window.webkit.messageHandlers &&
+                  window.webkit.messageHandlers.musikeRoute;
+          var buttons = document.querySelectorAll('button');
+          for (var i = 0; i < buttons.length; i++) {
+            var label = buttons[i].getAttribute('aria-label') || '';
+            if (label.indexOf('Open Now playing:') === 0) {
+              buttons[i].click();
+              setTimeout(function(){
+                if (h) h.postMessage((location.pathname || '/') + (location.search || '') + (location.hash || ''));
+              }, 50);
+              return;
+            }
+          }
+          history.pushState({ idx: (window.history.state?.idx ?? 0) + 1 }, '', '#now-playing');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          setTimeout(function(){
+            if (h) h.postMessage((location.pathname || '/') + (location.search || '') + (location.hash || ''));
+          }, 0);
+        })();
+        """
+        webView?.evaluateJavaScript(js)
+    }
+
     // MARK: - GlassPlayer plugin calls
 
     func setGlassEnabled(_ enabled: Bool) {
@@ -582,6 +614,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
             guard let self else { return }
             self.miniGlass.isHidden = !enabled
             self.tabBar.isHidden = !enabled
+            self.homeVisible = enabled ? false : (self.currentPath == "/")
+            self.homeScrollView.isHidden = !self.homeVisible
             if !enabled {
                 self.miniTitle.text = "Not Playing"
                 self.miniArtist.text = ""
@@ -609,6 +643,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate {
             self.playButton.accessibilityLabel = playing ? "Pause" : "Play"
             self.setProgress(progress)
         }
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldReceive touch: UITouch) -> Bool {
+        if let view = touch.view, view is UIButton { return false }
+        return true
     }
 
     private func setProgress(_ value: Double) {
