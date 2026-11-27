@@ -2,12 +2,11 @@ import {
   CaretRightIcon,
   GearSixIcon,
   HeartIcon,
-  MagnifyingGlassIcon,
   PlayIcon,
   RadioIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { LogoMark } from "../components/Brand";
 import { Section } from "../components/Page";
@@ -230,13 +229,10 @@ export default function Home() {
   const history = lib.history ?? [];
   const status = lib.status;
   const playList = usePlayer((s) => s.playList);
-  const navigate = useNavigate();
   const t = useT();
   const show = useAppearance();
   const lang = useI18n((s) => s.lang);
   const genres = useRemote<Genre[]>(`home-genres:${lang}`, () => api.genres());
-
-  const empty = status === "ready" && !favorites.length && !playlists.length && !history.length;
 
   const feature: Feature | null = history[0]
     ? {
@@ -284,26 +280,7 @@ export default function Home() {
 
       {status !== "loading" && (
         <div className="flex flex-col gap-10">
-          {feature ? (
-            <FeatureCard feature={feature} />
-          ) : empty ? (
-            <div className="mx-4 mt-2 flex flex-col items-start gap-5 rounded-[26px] bg-surface-2 p-6 ring-1 ring-line md:mx-6 md:flex-row md:items-center md:p-8">
-              <span className="grid size-16 shrink-0 place-items-center rounded-[18px] bg-accent text-accent-ink">
-                <LogoMark className="size-10" />
-              </span>
-              <div className="flex-1">
-                <p className="text-xl font-semibold tracking-tight">{t.home.startTitle}</p>
-                <p className="mt-1 max-w-[52ch] text-sm text-fg-2">{t.home.startBody}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate(paths.search)}
-                className="flex h-12 items-center gap-2 rounded-full bg-accent pr-6 pl-5 font-semibold text-accent-ink transition-transform active:scale-[0.97]"
-              >
-                <MagnifyingGlassIcon size={20} weight="bold" /> {t.common.searchMusic}
-              </button>
-            </div>
-          ) : null}
+          {feature ? <FeatureCard feature={feature} /> : null}
 
           {playlists.length > 0 && (
             <Section title={t.home.playlistsForYou}>

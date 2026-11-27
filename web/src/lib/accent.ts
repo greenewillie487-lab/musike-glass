@@ -11,7 +11,8 @@ const LIGHT_SURFACE: Rgb = [0xf2, 0xf3, 0xf6]; // --surface-2, light theme
 const WHITE: Rgb = [255, 255, 255];
 const BLACK: Rgb = [0, 0, 0];
 
-export const DEFAULT_ACCENT = "#c3ec52";
+// Apple Music red, matched to the native chrome's tab tint (MusikeWebViewController.activeColor).
+export const DEFAULT_ACCENT = "#fa243d";
 
 export const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
 

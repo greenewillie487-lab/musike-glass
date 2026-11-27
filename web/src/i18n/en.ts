@@ -404,7 +404,7 @@ export const en = {
     accent: "Accent color",
     customColor: "Custom color",
     colors: {
-      volt: "Volt",
+      red: "Apple Red",
       mint: "Mint",
       aqua: "Aqua",
       sky: "Sky",

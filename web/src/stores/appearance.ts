@@ -24,9 +24,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
   homeFavorites: true,
 };
 
-/** Ready-made accents. "volt" is Musike's own. */
+/** Ready-made accents. "red" is the default (Apple Music red, matches the native chrome tint). */
 export const ACCENTS = [
-  { id: "volt", color: DEFAULT_ACCENT },
+  { id: "red", color: DEFAULT_ACCENT },
   { id: "mint", color: "#34d399" },
   { id: "aqua", color: "#22d3ee" },
   { id: "sky", color: "#60a5fa" },
