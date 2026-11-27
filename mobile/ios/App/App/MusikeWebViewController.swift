@@ -293,6 +293,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     private func buildNewPlaceholder() {
+        newPlaceholder.isHidden = true
         let title = UILabel()
         title.text = "New"
         title.font = .systemFont(ofSize: 34, weight: .bold)
@@ -634,7 +635,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
           function postRoute(){
             var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeRoute;
-            if(h) h.postMessage(location.pathname || '/');
+            if(h) h.postMessage((location.pathname || '/') + (location.search || '') + (location.hash || ''));
           }
           var push = history.pushState, replace = history.replaceState;
           history.pushState = function(){ var r = push.apply(this, arguments); postRoute(); return r; };
