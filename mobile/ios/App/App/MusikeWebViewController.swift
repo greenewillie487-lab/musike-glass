@@ -144,6 +144,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// active scroll view's contentOffset; no boolean collapse flag and no
     /// accumulated delta, so the title tracks position continuously.
     private var scrollProgress: CGFloat = 0
+    /// A rail shows exactly two full cards. Each card keeps ONE stored width
+    /// constraint; only its constant is re-derived from the real scroller width
+    /// in viewDidLayoutSubviews, so no layout pass creates new constraints or
+    /// leaves a partial card peeking at either edge.
+    private struct RailLayout {
+        let scroller: UIScrollView
+        let spacing: CGFloat
+        let cardWidths: [NSLayoutConstraint]
+    }
+    private var railLayouts: [RailLayout] = []
+    private static let railSpacing: CGFloat = 12
     private var previewScrollOffset: CGFloat = 0
     private var previewNewTab = false
     private var previewRoute: String?
@@ -683,6 +694,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             view.removeFromSuperview()
         }
         displayItems = []
+        railLayouts = []
         let title = UILabel()
         title.text = "Home"
         title.font = .systemFont(ofSize: 34, weight: .bold)
@@ -710,20 +722,30 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
         let row = UIStackView()
         row.axis = .horizontal
-        row.spacing = 12
+        row.spacing = Self.railSpacing
         row.alignment = .top
+        // Seed with the best width known at build time; viewDidLayoutSubviews
+        // replaces it with the exact value from the scroller's real bounds.
+        let seedWidth = homeScrollView.bounds.width > 0
+            ? homeScrollView.bounds.width
+            : (view.bounds.width > 40 ? view.bounds.width - 40 : 300)
+        let seedCardWidth = max(1, (seedWidth - row.spacing) / 2)
+        var cardWidths: [NSLayoutConstraint] = []
         for item in items {
             let card = makeChartCard(item)
             displayItems.append(item)
             card.tag = displayItems.count - 1
+            let widthConstraint = card.widthAnchor.constraint(equalToConstant: seedCardWidth)
+            widthConstraint.isActive = true
+            cardWidths.append(widthConstraint)
             card.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(chartTapped(_:))))
             row.addArrangedSubview(card)
         }
         let scroller = UIScrollView()
         scroller.showsHorizontalScrollIndicator = false
         scroller.translatesAutoresizingMaskIntoConstraints = false
-        // Clip overflow so a neighbouring card's label/artwork cannot bleed past
-        // either edge of the rail (stray "S" at left, artwork fragment at right).
+        // Two width-fitted cards fill the rail exactly; clipping stays as a
+        // backstop for transient overscroll, not as the sliver fix itself.
         scroller.clipsToBounds = true
         scroller.layer.masksToBounds = true
         scroller.addSubview(row)
@@ -737,6 +759,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             scroller.heightAnchor.constraint(equalToConstant: 200)
         ])
         homeStack.addArrangedSubview(scroller)
+        railLayouts.append(RailLayout(scroller: scroller, spacing: row.spacing, cardWidths: cardWidths))
     }
 
     private func makeChartCard(_ item: [String: Any]) -> UIView {
@@ -745,7 +768,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         card.layer.cornerRadius = 12
         card.clipsToBounds = true
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.widthAnchor.constraint(equalToConstant: 144).isActive = true
+        // Width is owned by the rail's stored constraint (two full cards fit).
         card.heightAnchor.constraint(equalToConstant: 190).isActive = true
 
         let art = UIImageView()
@@ -1081,6 +1104,15 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         layoutActivePill()
+        // Fit exactly two full cards per rail from the scroller's real width.
+        // Update only stored constants; scrolling and all other metrics stay put.
+        for rail in railLayouts {
+            guard rail.scroller.bounds.width > 0 else { continue }
+            let cardWidth = max(1, (rail.scroller.bounds.width - rail.spacing) / 2)
+            for constraint in rail.cardWidths where constraint.constant != cardWidth {
+                constraint.constant = cardWidth
+            }
+        }
     }
 
     deinit {
