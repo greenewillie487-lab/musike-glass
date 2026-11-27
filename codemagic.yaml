@@ -12,6 +12,16 @@ workflows:
     scripts:
       - name: Install JS dependencies
         script: npx -y pnpm@10.15.0 install --frozen-lockfile
+      - name: Build web app from source and sync into native bundle
+        script: |
+          set -e
+          npx -y pnpm@10.15.0 --filter web build --mode native
+          test -d "$CM_BUILD_DIR/web/dist-native"
+          rm -rf "$CM_BUILD_DIR/mobile/ios/App/App/public"
+          mkdir -p "$CM_BUILD_DIR/mobile/ios/App/App/public"
+          rsync -a --delete "$CM_BUILD_DIR/web/dist-native/" "$CM_BUILD_DIR/mobile/ios/App/App/public/"
+          test ! -d "$CM_BUILD_DIR/mobile/ios/App/App/public/public"
+          echo "synced web files: $(find "$CM_BUILD_DIR/mobile/ios/App/App/public" -type f | wc -l)"
       - name: Stage Capacitor plugin sources
         script: |
           mkdir -p "$CM_BUILD_DIR/ios-plugins"
@@ -61,6 +71,16 @@ workflows:
     scripts:
       - name: Install JS dependencies
         script: npx -y pnpm@10.15.0 install --frozen-lockfile
+      - name: Build web app from source and sync into native bundle
+        script: |
+          set -e
+          npx -y pnpm@10.15.0 --filter web build --mode native
+          test -d "$CM_BUILD_DIR/web/dist-native"
+          rm -rf "$CM_BUILD_DIR/mobile/ios/App/App/public"
+          mkdir -p "$CM_BUILD_DIR/mobile/ios/App/App/public"
+          rsync -a --delete "$CM_BUILD_DIR/web/dist-native/" "$CM_BUILD_DIR/mobile/ios/App/App/public/"
+          test ! -d "$CM_BUILD_DIR/mobile/ios/App/App/public/public"
+          echo "synced web files: $(find "$CM_BUILD_DIR/mobile/ios/App/App/public" -type f | wc -l)"
       - name: Stage Capacitor plugin sources
         script: |
           mkdir -p "$CM_BUILD_DIR/ios-plugins"
