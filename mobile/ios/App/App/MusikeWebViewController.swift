@@ -146,6 +146,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var scrollProgress: CGFloat = 0
     private var previewScrollOffset: CGFloat = 0
     private var previewNewTab = false
+    private var previewRoute: String?
     private var previewLight = false
     private var newOverlay: UIView?
     private var isObservingScroll = false
@@ -864,7 +865,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     func setRoute(_ url: String) {
         if radioSelected && (url == "/" || url.isEmpty) { return }
-        if previewNewTab && (url == "/" || url.isEmpty) { return }
+        if (previewNewTab || previewRoute != nil) && (url == "/" || url.isEmpty) { return }
         if newOverlay != nil || !newPlaceholder.isHidden { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
@@ -1062,6 +1063,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                 previewScrollOffset = CGFloat(Double(value) ?? 0)
             } else if argument == "-previewTab=new" {
                 previewNewTab = true
+            } else if argument.hasPrefix("-previewRoute=") {
+                previewRoute = String(argument.dropFirst("-previewRoute=".count))
             } else if argument == "-previewAppearance=light" {
                 previewLight = true
             }
@@ -1073,13 +1076,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             overrideUserInterfaceStyle = .light
             setAppearance("light")
         }
-        if previewNewTab {
-            setActiveTab(1)
+        if previewNewTab || previewRoute != nil {
+            let route = previewRoute ?? "/new"
+            if route.hasPrefix("/search") { setActiveTab(4) }
+            else if route.hasPrefix("/library") || route.hasPrefix("/favorites") ||
+                    route.hasPrefix("/history") || route.hasPrefix("/playlist") { setActiveTab(3) }
+            else { setActiveTab(1) }
             homeVisible = false
             homeScrollView.isHidden = true
             hideNewPlaceholder()
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-                self?.navigate(to: "/new")
+                self?.navigate(to: route)
             }
         }
         applyPreviewScroll()

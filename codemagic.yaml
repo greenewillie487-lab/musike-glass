@@ -133,8 +133,14 @@ workflows:
           capture preview-03-home-light.png -previewAppearance=light
           xcrun simctl ui "$UDID" appearance dark || true
           capture preview-04-new-page-dark.png -previewTab=new
+          capture preview-05-library-dark.png -previewRoute=/library
+          capture preview-06-search-dark.png -previewRoute=/search
+          capture preview-07-artist-dark.png -previewRoute=/search/artist/Tems
     artifacts:
       - $CM_BUILD_DIR/preview-01-home-dark.png
       - $CM_BUILD_DIR/preview-02-home-scrolled-dark.png
       - $CM_BUILD_DIR/preview-03-home-light.png
       - $CM_BUILD_DIR/preview-04-new-page-dark.png
+      - $CM_BUILD_DIR/preview-05-library-dark.png
+      - $CM_BUILD_DIR/preview-06-search-dark.png
+      - $CM_BUILD_DIR/preview-07-artist-dark.png
