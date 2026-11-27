@@ -295,6 +295,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func buildNewPlaceholder() {
         newPlaceholder.isHidden = true
+        newPlaceholder.backgroundColor = .systemBackground
         let title = UILabel()
         title.text = "New"
         title.font = .systemFont(ofSize: 34, weight: .bold)
