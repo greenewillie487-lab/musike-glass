@@ -129,10 +129,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var tabSizingStates: [Int: TabSizingState] = [:]
     private var currentTabSizingBucket = -1
     private static let tabGlyphs: [(normal: String, selected: String, title: String, key: String)] = [
-        ("house", "house.fill", "Home", "home"),
-        ("square.grid.2x2.fill", "square.grid.2x2.fill", "New", "new"),
+        ("house", "house", "Home", "home"),
+        ("square.grid.2x2", "square.grid.2x2", "New", "new"),
         ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
-        ("music.note.tv.fill", "music.note.tv.fill", "Library", "library"),
+        ("music.note.tv", "music.note.tv", "Library", "library"),
         ("magnifyingglass", "magnifyingglass", "Search", "search")
     ]
     private let compactTitleLabel = UILabel()
@@ -348,9 +348,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                 layout.normal.titleTextAttributes[.font] = titleFont
                 layout.normal.titleTextAttributes[.foregroundColor] = UIColor.secondaryLabel
                 layout.normal.iconColor = .secondaryLabel
+                layout.normal.iconSize = CGSize(width: iconSize, height: iconSize)
                 layout.selected.titleTextAttributes[.font] = titleFont
                 layout.selected.titleTextAttributes[.foregroundColor] = activeColor
                 layout.selected.iconColor = activeColor
+                layout.selected.iconSize = CGSize(width: iconSize, height: iconSize)
             }
 
             states[bucket] = TabSizingState(
