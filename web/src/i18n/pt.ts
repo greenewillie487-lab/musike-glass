@@ -60,6 +60,12 @@ export const pt: Messages = {
     startBody: "Procure qualquer música ou clipe do YouTube. Toca como áudio ou vídeo, sem anúncios.",
     seeAll: "Ver tudo",
     yourFavorites: "Suas favoritas",
+    playlistsForYou: "Playlists feitas para você",
+    stationsForYou: "Estações para você",
+    station: "Estação",
+    featured: "Destaque",
+    continueListening: "Continue ouvindo",
+    yourPlaylist: "Sua playlist",
   },
 
   library: {

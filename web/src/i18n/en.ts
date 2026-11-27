@@ -65,6 +65,12 @@ export const en = {
     startBody: "Find any song or music video on YouTube. It plays as audio or video, with no ads.",
     seeAll: "See all",
     yourFavorites: "Your favorites",
+    playlistsForYou: "Playlists Made For You",
+    stationsForYou: "Stations for You",
+    station: "Station",
+    featured: "Featured",
+    continueListening: "Continue listening",
+    yourPlaylist: "Your playlist",
   },
 
   library: {

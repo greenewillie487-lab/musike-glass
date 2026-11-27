@@ -1,153 +1,328 @@
-import { ClockCounterClockwiseIcon, HeartIcon, MagnifyingGlassIcon, PlayIcon } from "@phosphor-icons/react";
+import {
+  CaretRightIcon,
+  GearSixIcon,
+  HeartIcon,
+  MagnifyingGlassIcon,
+  PlayIcon,
+  RadioIcon,
+} from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { LogoMark } from "../components/Brand";
-import { PageHeader, Section } from "../components/Page";
+import { Section } from "../components/Page";
 import { TrackList, TrackListSkeleton } from "../components/TrackList";
-import { useT } from "../i18n";
+import { useRemote } from "../hooks/useRemote";
+import { useI18n, useT } from "../i18n";
+import { api } from "../lib/api";
 import { paths } from "../lib/routes";
-import type { Track } from "../lib/types";
+import type { Genre, Playlist, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useAppearance } from "../stores/appearance";
 import { useLibrary } from "../stores/library";
+import { needsAttention, openSettings, useSystem } from "../stores/system";
 
-function Shortcut({ to, label, tracks, cover }: { to: string; label: string; tracks: Track[]; cover: ReactNode }) {
-  const playList = usePlayer((s) => s.playList);
-  const t = useT();
+/** Deterministic card colour derived from a real id/name — no random or invented artwork. */
+function cardGradient(key: string) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 360;
+  return `linear-gradient(135deg, hsl(${h} 84% 54%), hsl(${(h + 42) % 360} 72% 30%) 60%, hsl(${(h + 74) % 360} 60% 17%))`;
+}
+
+/** The badge on editorial cards: our own mark, not a fake Apple Music badge. */
+function CardBadge() {
   return (
-    <div className="group relative flex h-14 items-center gap-3 overflow-hidden rounded-[12px] bg-surface-2 pr-2 transition-colors hover:bg-surface-3 md:h-16">
-      <Link to={to} className="absolute inset-0" aria-label={label} />
-      <span className="pointer-events-none size-14 shrink-0 overflow-hidden md:size-16">{cover}</span>
-      <span className="pointer-events-none min-w-0 flex-1 truncate text-[13px] font-semibold md:text-sm">{label}</span>
-      {tracks.length > 0 && (
+    <span className="grid h-6 items-center gap-1 rounded-full bg-black/25 px-2 text-[10px] font-bold tracking-wide text-white/90 backdrop-blur-sm">
+      <LogoMark className="size-3" /> musike
+    </span>
+  );
+}
+
+function HomeHeader() {
+  const t = useT();
+  const info = useSystem((s) => s.info);
+  const attention = needsAttention(info);
+  return (
+    <header className="safe-top sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg/85 px-4 pt-3 pb-4 backdrop-blur-xl md:bg-surface-1/85 md:px-6 md:pt-6">
+      <h1 className="text-[34px] leading-none font-bold tracking-tight md:text-[40px]">{t.nav.home}</h1>
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
-          onClick={() => playList(tracks, 0)}
-          aria-label={t.common.playX(label)}
-          className="relative z-10 hidden size-10 shrink-0 place-items-center rounded-full bg-accent text-accent-ink opacity-0 shadow-[0_6px_18px_rgb(0_0_0/0.35)] transition-[opacity,transform] duration-200 ease-out-expo group-hover:opacity-100 hover:scale-105 active:scale-95 md:grid"
+          onClick={openSettings}
+          aria-label={attention ? t.nav.settingsAttention : t.nav.settings}
+          title={t.nav.settings}
+          className="relative grid size-10 place-items-center rounded-full text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg"
         >
-          <PlayIcon size={18} weight="fill" />
+          <GearSixIcon size={20} />
+          {attention && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-accent ring-2 ring-bg" />}
+        </button>
+        <Link
+          to={paths.favorites}
+          aria-label={t.nav.favorites}
+          title={t.nav.favorites}
+          className="grid size-11 place-items-center rounded-full bg-gradient-to-br from-[#c9a7ff] to-[#7b52e0] shadow-[0_6px_18px_rgb(0_0_0/0.25)] ring-1 ring-white/30 transition-transform active:scale-95"
+        >
+          <HeartIcon size={24} weight="fill" className="text-[#ff2d55]" />
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+interface Feature {
+  label: string;
+  title: string;
+  subtitle: string;
+  art: string;
+  thumb: string;
+  to: string;
+  tracks: Track[];
+  start: number;
+}
+
+/** One large editorial card, built only from something the library actually contains. */
+function FeatureCard({ feature }: { feature: Feature }) {
+  const t = useT();
+  const playList = usePlayer((s) => s.playList);
+  return (
+    <section className="px-4 pt-2 md:px-6" aria-label={feature.label}>
+      <div className="relative isolate overflow-hidden rounded-[26px] bg-surface-2 ring-1 ring-line">
+        <Artwork src={feature.art} fallback={feature.thumb} className="absolute inset-0 size-full" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/25" />
+        <div className="relative flex min-h-[300px] flex-col justify-between gap-10 p-6 md:min-h-[340px] md:p-8">
+          <span className="text-[11px] font-semibold tracking-[0.18em] text-white/70 uppercase">{feature.label}</span>
+          <div className="min-w-0">
+            <h2 className="line-clamp-2 text-[30px] leading-[1.05] font-bold tracking-tight text-white md:text-4xl">{feature.title}</h2>
+            <p className="mt-2 truncate text-sm text-white/70">{feature.subtitle}</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => playList(feature.tracks, feature.start)}
+              aria-label={t.common.playX(feature.title)}
+              className="grid size-14 place-items-center rounded-full bg-white text-black shadow-[0_8px_24px_rgb(0_0_0/0.35)] transition-transform hover:scale-105 active:scale-95"
+            >
+              <PlayIcon size={26} weight="fill" />
+            </button>
+            <Link to={feature.to} className="flex items-center gap-0.5 text-sm font-semibold text-white/90 hover:text-white">
+              {t.home.seeAll} <CaretRightIcon size={14} weight="bold" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PlaylistCard({ playlist }: { playlist: Playlist }) {
+  const t = useT();
+  const playList = usePlayer((s) => s.playList);
+  return (
+    <div
+      className="group relative w-[58vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-[18px] md:w-[248px]"
+      style={{ background: cardGradient(playlist.id) }}
+    >
+      <div className="pointer-events-none relative flex aspect-[4/5] flex-col justify-between p-4">
+        <div className="flex justify-between gap-2">
+          {playlist.tracks.length > 0 && (
+            <span className="grid size-7 place-items-center rounded-full bg-black/25 text-white/90 backdrop-blur-sm">
+              <PlayIcon size={14} weight="fill" />
+            </span>
+          )}
+          <span className="ml-auto"><CardBadge /></span>
+        </div>
+        <div className="min-w-0">
+          <p className="line-clamp-3 text-[26px] leading-[1.06] font-bold tracking-tight text-white drop-shadow-sm">{playlist.name}</p>
+          <p className="mt-2 text-xs text-white/70">{t.common.tracks(playlist.tracks.length)}</p>
+        </div>
+      </div>
+      <Link to={paths.playlist(playlist.id)} className="absolute inset-0 z-10" aria-label={playlist.name} />
+      {playlist.tracks.length > 0 && (
+        <button
+          type="button"
+          onClick={() => playList(playlist.tracks, 0)}
+          aria-label={t.common.playX(playlist.name)}
+          className="absolute bottom-3 right-3 z-20 grid size-11 place-items-center rounded-full bg-white text-black opacity-0 shadow-[0_8px_20px_rgb(0_0_0/0.4)] transition-[opacity,transform] duration-200 ease-out-expo hover:scale-105 group-hover:opacity-100 group-focus-within:opacity-100"
+        >
+          <PlayIcon size={20} weight="fill" />
         </button>
       )}
     </div>
   );
 }
 
+function StationCard({ genre }: { genre: Genre }) {
+  const t = useT();
+  return (
+    <Link
+      to={paths.genre(genre.id)}
+      state={{ name: genre.name }}
+      className="group flex w-[34vw] max-w-[180px] shrink-0 snap-start flex-col gap-2 md:w-[164px]"
+    >
+      <span className="relative block aspect-square overflow-hidden rounded-[14px]" style={{ background: cardGradient(genre.id) }}>
+        <span className="absolute inset-0 grid place-items-center">
+          <RadioIcon size={40} weight="fill" className="text-white/90 drop-shadow-[0_2px_8px_rgb(0_0_0/0.35)] transition-transform duration-300 ease-out-expo group-hover:scale-110" />
+        </span>
+        <span className="absolute top-2 right-2"><CardBadge /></span>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-medium">{genre.name}</span>
+        <span className="block truncate text-xs text-fg-2">{t.home.station}</span>
+      </span>
+    </Link>
+  );
+}
+
 function RecentCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
   return (
-    <button type="button" onClick={onPlay} className="group flex w-36 shrink-0 snap-start flex-col gap-2 text-left md:w-44">
+    <button
+      type="button"
+      onClick={onPlay}
+      className="group flex w-[44vw] max-w-[260px] shrink-0 snap-start flex-col gap-2 text-left md:w-[240px] lg:w-[280px]"
+    >
       <span className="relative block">
-        <Artwork src={track.art} fallback={track.thumb} className="aspect-square w-full rounded-[14px]" />
-        <span className="absolute right-2 bottom-2 grid size-11 translate-y-1 place-items-center rounded-full bg-accent text-accent-ink opacity-0 shadow-[0_8px_20px_rgb(0_0_0/0.4)] transition-[opacity,transform] duration-200 ease-out-expo group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:opacity-100">
-          <PlayIcon size={20} weight="fill" />
+        <Artwork src={track.art} fallback={track.thumb} className="aspect-square w-full rounded-[16px]" />
+        <span className="absolute right-3 bottom-3 grid size-12 translate-y-1 place-items-center rounded-full bg-accent text-accent-ink opacity-0 shadow-[0_8px_20px_rgb(0_0_0/0.4)] transition-[opacity,transform] duration-200 ease-out-expo group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+          <PlayIcon size={22} weight="fill" />
         </span>
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-medium">{track.title}</span>
+        <span className="block truncate text-sm font-semibold">{track.title}</span>
         <span className="block truncate text-xs text-fg-2">{track.artist}</span>
       </span>
     </button>
   );
 }
 
+function Rail({ children }: { children: ReactNode }) {
+  return (
+    <div className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
+      {children}
+    </div>
+  );
+}
+
+function SeeAll({ to }: { to: string }) {
+  const t = useT();
+  return (
+    <Link to={to} className="flex items-center gap-0.5 text-sm font-medium text-fg-2 hover:text-fg">
+      {t.home.seeAll} <CaretRightIcon size={14} weight="bold" />
+    </Link>
+  );
+}
+
 export default function Home() {
-  const { favorites, playlists, history, status } = useLibrary();
+  const lib = useLibrary();
+  // A partial/error API response must not crash the page.
+  const favorites = lib.favorites ?? [];
+  const playlists = lib.playlists ?? [];
+  const history = lib.history ?? [];
+  const status = lib.status;
   const playList = usePlayer((s) => s.playList);
   const navigate = useNavigate();
   const t = useT();
   const show = useAppearance();
+  const lang = useI18n((s) => s.lang);
+  const genres = useRemote<Genre[]>(`home-genres:${lang}`, () => api.genres());
+
   const empty = status === "ready" && !favorites.length && !playlists.length && !history.length;
+
+  const feature: Feature | null = history[0]
+    ? {
+        label: t.home.continueListening,
+        title: history[0].title,
+        subtitle: history[0].artist,
+        art: history[0].art,
+        thumb: history[0].thumb,
+        to: paths.history,
+        tracks: history,
+        start: 0,
+      }
+    : playlists[0]
+      ? {
+          label: t.home.yourPlaylist,
+          title: playlists[0].name,
+          subtitle: t.common.tracks(playlists[0].tracks.length),
+          art: playlists[0].tracks[0]?.art ?? "",
+          thumb: playlists[0].tracks[0]?.thumb ?? "",
+          to: paths.playlist(playlists[0].id),
+          tracks: playlists[0].tracks,
+          start: 0,
+        }
+      : favorites[0]
+        ? {
+            label: t.home.featured,
+            title: t.nav.favorites,
+            subtitle: t.common.tracks(favorites.length),
+            art: favorites[0].art,
+            thumb: favorites[0].thumb,
+            to: paths.favorites,
+            tracks: favorites,
+            start: 0,
+          }
+        : null;
 
   return (
     <div className="pb-8">
-      <PageHeader />
-
-      <div className="px-4 pt-2 pb-6 md:px-6 md:pt-8">
-        <h1 className="text-[28px] leading-tight font-semibold tracking-tight md:text-4xl">{t.time.greeting(new Date().getHours())}</h1>
-      </div>
+      <HomeHeader />
 
       {status === "loading" && <TrackListSkeleton rows={6} />}
 
-      {empty && (
-        <div className="mx-4 flex flex-col items-start gap-5 rounded-[20px] bg-surface-2 p-6 ring-1 ring-line md:mx-6 md:flex-row md:items-center md:p-8">
-          <span className="grid size-16 shrink-0 place-items-center rounded-[18px] bg-accent text-accent-ink">
-            <LogoMark className="size-10" />
-          </span>
-          <div className="flex-1">
-            <p className="text-xl font-semibold tracking-tight">{t.home.startTitle}</p>
-            <p className="mt-1 max-w-[52ch] text-sm text-fg-2">{t.home.startBody}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate(paths.search)}
-            className="flex h-12 items-center gap-2 rounded-full bg-accent pr-6 pl-5 font-semibold text-accent-ink transition-transform active:scale-[0.97]"
-          >
-            <MagnifyingGlassIcon size={20} weight="bold" /> {t.common.searchMusic}
-          </button>
-        </div>
-      )}
-
-      {!empty && status === "ready" && (
+      {status !== "loading" && (
         <div className="flex flex-col gap-10">
-          {show.homeShortcuts && <div className="grid grid-cols-2 gap-2 px-4 md:px-6 lg:grid-cols-3 2xl:grid-cols-4">
-            <Shortcut
-              to={paths.favorites}
-              label={t.nav.favorites}
-              tracks={favorites}
-              cover={
-                <span className="grid size-full place-items-center bg-accent-soft text-accent-text">
-                  <HeartIcon size={24} weight="fill" />
-                </span>
-              }
-            />
-            <Shortcut
-              to={paths.history}
-              label={t.nav.recentlyPlayed}
-              tracks={history}
-              cover={
-                <span className="grid size-full place-items-center bg-surface-3 text-fg-2">
-                  <ClockCounterClockwiseIcon size={24} />
-                </span>
-              }
-            />
-            {playlists.slice(0, 6).map((p) => (
-              <Shortcut
-                key={p.id}
-                to={paths.playlist(p.id)}
-                label={p.name}
-                tracks={p.tracks}
-                cover={<Artwork src={p.tracks[0]?.thumb} className="size-full" />}
-              />
-            ))}
-          </div>}
+          {feature ? (
+            <FeatureCard feature={feature} />
+          ) : empty ? (
+            <div className="mx-4 mt-2 flex flex-col items-start gap-5 rounded-[26px] bg-surface-2 p-6 ring-1 ring-line md:mx-6 md:flex-row md:items-center md:p-8">
+              <span className="grid size-16 shrink-0 place-items-center rounded-[18px] bg-accent text-accent-ink">
+                <LogoMark className="size-10" />
+              </span>
+              <div className="flex-1">
+                <p className="text-xl font-semibold tracking-tight">{t.home.startTitle}</p>
+                <p className="mt-1 max-w-[52ch] text-sm text-fg-2">{t.home.startBody}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(paths.search)}
+                className="flex h-12 items-center gap-2 rounded-full bg-accent pr-6 pl-5 font-semibold text-accent-ink transition-transform active:scale-[0.97]"
+              >
+                <MagnifyingGlassIcon size={20} weight="bold" /> {t.common.searchMusic}
+              </button>
+            </div>
+          ) : null}
+
+          {playlists.length > 0 && (
+            <Section title={t.home.playlistsForYou}>
+              <Rail>
+                {playlists.slice(0, 12).map((p) => (
+                  <PlaylistCard key={p.id} playlist={p} />
+                ))}
+              </Rail>
+            </Section>
+          )}
+
+          {genres.status === "ok" && genres.data.length > 0 && (
+            <Section title={t.home.stationsForYou}>
+              <Rail>
+                {genres.data.slice(0, 16).map((g) => (
+                  <StationCard key={g.id} genre={g} />
+                ))}
+              </Rail>
+            </Section>
+          )}
 
           {show.homeRecent && history.length > 0 && (
-            <Section
-              title={t.nav.recentlyPlayed}
-              action={
-                <Link to={paths.history} className="text-sm font-medium text-fg-2 hover:text-fg">
-                  {t.home.seeAll}
-                </Link>
-              }
-            >
-              <div className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 md:scroll-px-6 md:px-6">
-                {history.slice(0, 16).map((t, i) => (
-                  <RecentCard key={t.id} track={t} onPlay={() => playList(history, i)} />
+            <Section title={t.nav.recentlyPlayed} action={<SeeAll to={paths.history} />}>
+              <Rail>
+                {history.slice(0, 16).map((track, i) => (
+                  <RecentCard key={track.id} track={track} onPlay={() => playList(history, i)} />
                 ))}
-              </div>
+              </Rail>
             </Section>
           )}
 
           {show.homeFavorites && favorites.length > 0 && (
-            <Section
-              title={t.home.yourFavorites}
-              action={
-                <Link to={paths.favorites} className="text-sm font-medium text-fg-2 hover:text-fg">
-                  {t.home.seeAll}
-                </Link>
-              }
-            >
+            <Section title={t.home.yourFavorites} action={<SeeAll to={paths.favorites} />}>
               <div className="px-2 md:px-3">
                 <TrackList tracks={favorites.slice(0, 5)} context={favorites} header={false} showAlbum={false} />
               </div>
