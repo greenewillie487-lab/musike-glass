@@ -12,10 +12,10 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.3"),
-        .package(name: "CapacitorApp", path: "../../../../node_modules/.pnpm/@capacitor+app@8.1.2_@capacitor+core@8.5.3/node_modules/@capacitor/app"),
-        .package(name: "CapacitorFilesystem", path: "../../../../node_modules/.pnpm/@capacitor+filesystem@8.1.5_@capacitor+core@8.5.3/node_modules/@capacitor/filesystem"),
-        .package(name: "CapacitorKeyboard", path: "../../../../node_modules/.pnpm/@capacitor+keyboard@8.0.6_@capacitor+core@8.5.3/node_modules/@capacitor/keyboard"),
-        .package(name: "CapacitorShare", path: "../../../../node_modules/.pnpm/@capacitor+share@8.0.3_@capacitor+core@8.5.3/node_modules/@capacitor/share")
+        .package(name: "CapacitorApp", path: "../../../../ios-plugins/CapacitorApp"),
+        .package(name: "CapacitorFilesystem", path: "../../../../ios-plugins/CapacitorFilesystem"),
+        .package(name: "CapacitorKeyboard", path: "../../../../ios-plugins/CapacitorKeyboard"),
+        .package(name: "CapacitorShare", path: "../../../../ios-plugins/CapacitorShare")
     ],
     targets: [
         .target(

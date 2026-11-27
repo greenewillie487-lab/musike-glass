@@ -1,0 +1,29 @@
+{
+	"appId": "app.musike.android",
+	"appName": "Musike",
+	"webDir": "../web/dist-native",
+	"backgroundColor": "#0B0C0F",
+	"android": {
+		"allowMixedContent": false
+	},
+	"ios": {
+		"contentInset": "never",
+		"scrollEnabled": true,
+		"backgroundColor": "#000000"
+	},
+	"plugins": {
+		"Keyboard": {
+			"resize": "native"
+		},
+		"SystemBars": {
+			"insetsHandling": "native",
+			"initialViewportFitValueHint": "cover"
+		}
+	},
+	"packageClassList": [
+		"AppPlugin",
+		"FilesystemPlugin",
+		"KeyboardPlugin",
+		"SharePlugin"
+	]
+}
