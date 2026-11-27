@@ -1,4 +1,4 @@
-import { ClockIcon, DotsThreeIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
+import { ClockIcon, DotsThreeIcon, DownloadSimpleIcon, HeartIcon, VideoCameraIcon } from "@phosphor-icons/react";
 import { memo, type MouseEvent } from "react";
 import { useT } from "../i18n";
 import { cn, formatTime } from "../lib/format";
@@ -16,9 +16,11 @@ interface RowProps {
   onPlay: () => void;
   playlistId?: string;
   showAlbum: boolean;
+  /** Artist page rows: 48px art, no track number, download + more actions. */
+  artistStyle?: boolean;
 }
 
-const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, showAlbum }: RowProps) {
+const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, showAlbum, artistStyle }: RowProps) {
   const isCurrent = usePlayer((s) => selectCurrent(s)?.id === track.id);
   const isPlaying = usePlayer((s) => s.status === "playing" || s.status === "loading");
   const isFavorite = useLibrary((s) => s.favorites.some((t) => t.id === track.id));
@@ -39,9 +41,12 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
       onContextMenu={menuAt}
       className={cn(
         "group relative grid items-center gap-3 rounded-xl px-2 py-1.5 transition-colors duration-150 hover:bg-surface-2 md:px-3",
-        showAlbum
-          ? "grid-cols-[auto_1fr_auto] md:grid-cols-[28px_auto_1fr_auto_auto] lg:grid-cols-[28px_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
-          : "grid-cols-[auto_1fr_auto] md:grid-cols-[28px_auto_1fr_auto_auto]",
+        artistStyle && "after:pointer-events-none after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-line/60",
+        artistStyle
+          ? "grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+          : showAlbum
+            ? "grid-cols-[auto_1fr_auto] md:grid-cols-[28px_auto_1fr_auto_auto] lg:grid-cols-[28px_auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+            : "grid-cols-[auto_1fr_auto] md:grid-cols-[28px_auto_1fr_auto_auto]",
       )}
     >
       <button
@@ -51,14 +56,14 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
         className="absolute inset-0 rounded-xl focus-visible:outline-offset-[-2px]"
       />
 
-      <span className="pointer-events-none hidden justify-center font-mono text-[13px] text-fg-3 tabular-nums md:flex">
+      <span className={cn("pointer-events-none justify-center font-mono text-[13px] text-fg-3 tabular-nums", artistStyle ? "hidden" : "hidden md:flex")}>
         {isCurrent ? <Equalizer live={isPlaying} /> : position + 1}
       </span>
 
       <div className="pointer-events-none relative">
-        <Artwork src={track.thumb} className="size-11 rounded-[10px]" />
+        <Artwork src={track.thumb} className={cn("rounded-[10px]", artistStyle ? "size-12 rounded-[8px]" : "size-11")} />
         {isCurrent && (
-          <span className="absolute inset-0 grid place-items-center rounded-[10px] bg-black/45 md:hidden">
+          <span className={cn("absolute inset-0 grid place-items-center rounded-[10px] bg-black/45 md:hidden", artistStyle && "rounded-[8px]")}>
             <Equalizer live={isPlaying} />
           </span>
         )}
@@ -76,30 +81,47 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
 
       {showAlbum && <p className="pointer-events-none hidden truncate text-sm text-fg-2 lg:block">{track.album ?? ""}</p>}
 
-      <div className="relative z-10 hidden items-center gap-1 md:flex">
+      {artistStyle && (
         <button
           type="button"
-          onClick={() => void toggleFavorite(track)}
-          aria-label={isFavorite ? t.common.removeFromFavorites : t.common.addToFavorites}
-          title={isFavorite ? t.common.removeFromFavorites : t.common.addToFavorites}
-          className={cn(
-            "grid size-8 place-items-center rounded-full transition-[opacity,transform] active:scale-90",
-            isFavorite ? "text-accent-text" : "text-fg-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-fg",
-          )}
+          onClick={() => window.open(`https://www.youtube.com/watch?v=${track.id}`, "_blank", "noopener")}
+          aria-label={t.trackMenu.openYoutube}
+          title={t.trackMenu.openYoutube}
+          className="relative z-10 grid size-8 place-items-center rounded-full text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg"
         >
-          <HeartIcon size={17} weight={isFavorite ? "fill" : "regular"} />
+          <DownloadSimpleIcon size={18} />
         </button>
-        <span className="pointer-events-none w-11 text-right font-mono text-[13px] text-fg-3 tabular-nums">
-          {track.duration ? formatTime(track.duration) : ""}
-        </span>
-      </div>
+      )}
+
+      {!artistStyle && (
+        <div className="relative z-10 hidden items-center gap-1 md:flex">
+          <button
+            type="button"
+            onClick={() => void toggleFavorite(track)}
+            aria-label={isFavorite ? t.common.removeFromFavorites : t.common.addToFavorites}
+            title={isFavorite ? t.common.removeFromFavorites : t.common.addToFavorites}
+            className={cn(
+              "grid size-8 place-items-center rounded-full transition-[opacity,transform] active:scale-90",
+              isFavorite ? "text-accent-text" : "text-fg-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-fg",
+            )}
+          >
+            <HeartIcon size={17} weight={isFavorite ? "fill" : "regular"} />
+          </button>
+          <span className="pointer-events-none w-11 text-right font-mono text-[13px] text-fg-3 tabular-nums">
+            {track.duration ? formatTime(track.duration) : ""}
+          </span>
+        </div>
+      )}
 
       <button
         type="button"
         onClick={menuAt}
         aria-label={t.trackList.moreFor(track.title)}
         title={t.trackList.more}
-        className="relative z-10 grid size-9 place-items-center rounded-full text-fg-2 transition-[opacity,background-color] hover:bg-surface-3 hover:text-fg md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+        className={cn(
+          "relative z-10 grid size-9 place-items-center rounded-full text-fg-2 transition-[opacity,background-color] hover:bg-surface-3 hover:text-fg",
+          !artistStyle && "md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
+        )}
       >
         <DotsThreeIcon size={22} weight="bold" />
       </button>
@@ -114,9 +136,11 @@ interface ListProps {
   playlistId?: string;
   showAlbum?: boolean;
   header?: boolean;
+  /** Artist page styling: 48px art, no track numbers, download + more actions. */
+  artistStyle?: boolean;
 }
 
-export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true }: ListProps) {
+export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true, artistStyle = false }: ListProps) {
   const playList = usePlayer((s) => s.playList);
   const t = useT();
   // Pages ask for the album column where it makes sense; Settings can turn it off everywhere.
@@ -150,6 +174,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
             position={i}
             playlistId={playlistId}
             showAlbum={showAlbum}
+            artistStyle={artistStyle}
             onPlay={() => playList(context ?? tracks, i)}
           />
         ))}

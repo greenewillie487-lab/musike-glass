@@ -1,5 +1,5 @@
-import { ArrowLeftIcon, GearSixIcon } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { ArrowLeftIcon, CaretLeftIcon, GearSixIcon } from "@phosphor-icons/react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
@@ -75,6 +75,61 @@ export function BackButton({ fallback, label }: { fallback: string; label?: stri
     >
       <ArrowLeftIcon size={16} /> {label ?? t.common.back}
     </button>
+  );
+}
+
+/** Frosted circular control for use over full-bleed artwork. */
+export function GlassCircleButton({
+  label,
+  className,
+  children,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      {...rest}
+      className={cn(
+        "relative grid size-9 shrink-0 place-items-center rounded-full bg-black/35 text-white ring-1 ring-white/20 backdrop-blur-xl",
+        "transition-[transform,background-color] duration-150 hover:bg-black/50 active:scale-90 focus-visible:outline-white",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Transparent navigation cluster that floats over a hero and clears the status bar. */
+export function HeroHeader({ back, actions }: { back: ReactNode; actions: ReactNode }) {
+  return (
+    <header
+      className={cn(
+        "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between",
+        "px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:px-4",
+      )}
+    >
+      <div className="pointer-events-auto flex items-center">{back}</div>
+      <div className="pointer-events-auto flex items-center gap-0.5 rounded-full bg-black/25 p-1 ring-1 ring-white/15 backdrop-blur-xl">
+        {actions}
+      </div>
+    </header>
+  );
+}
+
+/** Back in history when there is somewhere to go back to (in the app), else to `fallback`. */
+export function HeroBackButton({ fallback }: { fallback: string }) {
+  const navigate = useNavigate();
+  const t = useT();
+  return (
+    <GlassCircleButton
+      label={t.common.back}
+      onClick={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate(fallback))}
+    >
+      <CaretLeftIcon size={20} weight="bold" />
+    </GlassCircleButton>
   );
 }
 
