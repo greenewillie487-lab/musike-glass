@@ -27,6 +27,20 @@ jobs:
           npm install -g pnpm@10.15.0
           pnpm install --frozen-lockfile
 
+      - name: Stage Capacitor plugin sources (CapApp-SPM expects ios-plugins/)
+        run: |
+          set -e
+          mkdir -p ios-plugins
+          for p in app filesystem keyboard share; do
+            SRC=$(find node_modules/.pnpm -maxdepth 6 -type d -path "*@capacitor+$p@*/node_modules/@capacitor/$p" | head -1)
+            test -n "$SRC" || { echo "::error::plugin @$p not found in .pnpm store"; exit 1; }
+            DST="ios-plugins/Capacitor$(echo "$p" | sed 's/^\(.\)/\U\1/')"
+            rm -rf "$DST"
+            cp -R "$SRC" "$DST"
+            echo "staged $SRC -> $DST"
+          done
+          ls ios-plugins/
+
       - name: Build web app from source (native mode)
         run: |
           set -e
