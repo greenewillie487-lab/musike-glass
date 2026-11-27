@@ -348,6 +348,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                 layout.normal.titleTextAttributes[.font] = titleFont
                 layout.normal.titleTextAttributes[.foregroundColor] = UIColor.secondaryLabel
                 layout.normal.iconColor = .secondaryLabel
+                layout.selected.titleTextAttributes[.font] = titleFont
+                layout.selected.titleTextAttributes[.foregroundColor] = activeColor
+                layout.selected.iconColor = activeColor
+                layout.normal.titleTextAttributes[.font] = titleFont
+                layout.normal.titleTextAttributes[.foregroundColor] = UIColor.secondaryLabel
+                layout.normal.iconColor = .secondaryLabel
                 layout.normal.iconSize = CGSize(width: iconSize, height: iconSize)
                 layout.selected.titleTextAttributes[.font] = titleFont
                 layout.selected.titleTextAttributes[.foregroundColor] = activeColor
