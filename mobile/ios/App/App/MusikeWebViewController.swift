@@ -102,6 +102,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let tabBar = UITabBar(frame: .zero)
     private let miniGlass = UIVisualEffectView(frame: .zero)
     private let miniArtwork = UIImageView()
+    private let idleNoteLabel = UILabel()
     private let miniTitle = UILabel()
     private let miniArtist = UILabel()
     private let playButton = UIButton(type: .system)
@@ -375,6 +376,15 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
         miniArtwork.clipsToBounds = true
         miniArtwork.translatesAutoresizingMaskIntoConstraints = false
+        idleNoteLabel.text = "♪"
+        idleNoteLabel.font = .systemFont(ofSize: 22, weight: .regular)
+        idleNoteLabel.textAlignment = .center
+        idleNoteLabel.translatesAutoresizingMaskIntoConstraints = false
+        miniArtwork.addSubview(idleNoteLabel)
+        NSLayoutConstraint.activate([
+            idleNoteLabel.centerXAnchor.constraint(equalTo: miniArtwork.centerXAnchor),
+            idleNoteLabel.centerYAnchor.constraint(equalTo: miniArtwork.centerYAnchor)
+        ])
         setIdleArtwork(true)
 
         miniTitle.text = "Not Playing"
@@ -431,15 +441,21 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private func setIdleArtwork(_ idle: Bool) {
         miniArtwork.layer.cornerRadius = 10
         if idle {
-            let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
-            miniArtwork.image = UIImage(systemName: "music.note", withConfiguration: config)?.withRenderingMode(.alwaysTemplate)
-            miniArtwork.tintColor = .label
-            miniArtwork.backgroundColor = UIColor.systemGray4
+            miniArtwork.image = nil
+            miniArtwork.tintColor = nil
+            miniArtwork.backgroundColor = UIColor { traits in
+                traits.userInterfaceStyle == .dark
+                    ? UIColor(white: 0.28, alpha: 1)
+                    : UIColor.systemGray5
+            }
             miniArtwork.contentMode = .center
+            idleNoteLabel.isHidden = false
+            idleNoteLabel.textColor = .label
         } else {
             miniArtwork.tintColor = nil
             miniArtwork.backgroundColor = .clear
             miniArtwork.contentMode = .scaleAspectFill
+            idleNoteLabel.isHidden = true
         }
     }
 
