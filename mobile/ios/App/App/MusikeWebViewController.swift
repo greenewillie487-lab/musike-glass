@@ -864,6 +864,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     func setRoute(_ url: String) {
         if radioSelected && (url == "/" || url.isEmpty) { return }
+        if previewNewTab && (url == "/" || url.isEmpty) { return }
         if newOverlay != nil || !newPlaceholder.isHidden { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
@@ -876,6 +877,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
         if sheetOpen { return }
+        if path == "/new" { setActiveTab(1); return }
         if path.hasPrefix("/search") { setActiveTab(4) }
         else if path.hasPrefix("/library") || path.hasPrefix("/favorites") ||
                 path.hasPrefix("/history") || path.hasPrefix("/playlist") { setActiveTab(3) }
@@ -1076,7 +1078,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             homeVisible = false
             homeScrollView.isHidden = true
             hideNewPlaceholder()
-            navigate(to: "/new")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                self?.navigate(to: "/new")
+            }
         }
         applyPreviewScroll()
     }
