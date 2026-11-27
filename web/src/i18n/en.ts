@@ -79,6 +79,18 @@ export const en = {
     create: "Create",
     playlistSub: (n: number) => `Playlist · ${count(n, "track", "tracks")}`,
     noPlaylists: "You don't have any playlists yet. Create one here or use any track's menu to start one.",
+    sectionPlaylists: "Playlists",
+    sectionArtists: "Artists",
+    sectionAlbums: "Albums",
+    sectionSongs: "Songs",
+    sectionDownloaded: "Downloaded",
+    recentlyAdded: "Recently Added",
+    top100: "Top 100",
+    top100Sub: (n: number) => `Your listening history · ${count(n, "song", "songs")}`,
+    noDownloadsTitle: "Nothing downloaded",
+    noDownloads: "Musike streams songs from YouTube. Downloads aren't stored in your library.",
+    emptyTitle: "Your library starts here",
+    emptyBody: "Favorite a song or play something and it will show up here.",
   },
 
   collection: {

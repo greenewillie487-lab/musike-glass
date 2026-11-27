@@ -74,6 +74,18 @@ export const pt: Messages = {
     create: "Criar",
     playlistSub: (n) => `Playlist · ${count(n, "faixa", "faixas")}`,
     noPlaylists: "Você ainda não tem playlists. Crie uma aqui ou use o menu de qualquer faixa para começar uma.",
+    sectionPlaylists: "Playlists",
+    sectionArtists: "Artistas",
+    sectionAlbums: "Álbuns",
+    sectionSongs: "Músicas",
+    sectionDownloaded: "Baixadas",
+    recentlyAdded: "Adicionadas recentemente",
+    top100: "Top 100",
+    top100Sub: (n) => `Seu histórico de reprodução · ${count(n, "música", "músicas")}`,
+    noDownloadsTitle: "Nada baixado",
+    noDownloads: "O Musike transmite músicas do YouTube. Downloads não ficam guardados na biblioteca.",
+    emptyTitle: "Sua biblioteca começa aqui",
+    emptyBody: "Favoritar ou tocar uma música já faz ela aparecer aqui.",
   },
 
   collection: {
