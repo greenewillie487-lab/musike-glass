@@ -1,0 +1,134 @@
+name: Phase 3 Evidence (device IPA + 7-page simulator captures)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  evidence:
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26+ (UIGlassEffect requires the iOS 26 SDK)
+        run: |
+          set -e
+          ls /Applications | grep Xcode | sort -V | tail -5
+          XCODE_APP=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Selected: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          V=$(xcodebuild -version | head -1 | grep -o '[0-9][0-9]*\.[0-9]*')
+          MAJOR=${V%%.*}
+          echo "xcodebuild version: $V (major $MAJOR)"
+          test "$MAJOR" -ge 26 || { echo "::error::Xcode 26+ required for UIGlassEffect"; exit 1; }
+
+      - name: Install pnpm and JS dependencies
+        run: |
+          npm install -g pnpm@10.15.0
+          pnpm install --frozen-lockfile
+
+      - name: Build web app from source (native mode)
+        run: |
+          set -e
+          pnpm --filter web build --mode native
+          test -d web/dist-native
+
+      - name: Sync dist-native into the app bundle (no nested public/public)
+        run: |
+          set -e
+          rm -rf mobile/ios/App/App/public
+          mkdir -p mobile/ios/App/App/public
+          rsync -a --delete web/dist-native/ mobile/ios/App/App/public/
+          test ! -d mobile/ios/App/App/public/public
+          echo "synced web files: $(find mobile/ios/App/App/public -type f | wc -l)"
+
+      - name: Build unsigned device IPA
+        run: |
+          set -e
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath .derived \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+          APP=$(find .derived/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qr Musike-Phase3.ipa Payload
+
+      - name: Build simulator app
+        run: |
+          set -e
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .derived-sim \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+          find .derived-sim/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app'
+
+      - name: Boot simulator (dark)
+        run: |
+          set -e
+          xcrun simctl shutdown all || true
+          UDID=$(xcrun simctl list devices available | grep -m1 'iPhone' | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          test -n "$UDID"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          sleep 25
+          xcrun simctl ui "$UDID" appearance dark || true
+
+      - name: Capture 7 pages (app's own preview arguments)
+        run: |
+          set -e
+          UDID="$UDID"
+          APP=$(find .derived-sim/Build/Products/Release-iphonesimulator -maxdepth 1 -name '*.app' | head -1)
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p captures
+          capture () {
+            NAME="$1"; WAIT="$2"; shift 2
+            xcrun simctl terminate "$UDID" app.musike.ios 2>/dev/null || true
+            sleep 2
+            if [ "$#" -gt 0 ]; then
+              xcrun simctl launch "$UDID" app.musike.ios "$@"
+            else
+              xcrun simctl launch "$UDID" app.musike.ios
+            fi
+            sleep "$WAIT"
+            xcrun simctl io "$UDID" screenshot "captures/${NAME}.png"
+            echo "captured ${NAME}"
+          }
+          capture preview-01-home-dark          14
+          capture preview-02-home-scrolled-dark 16 -previewRoute=/ -previewScroll=900
+          capture preview-03-home-light         14 -previewAppearance=light
+          capture preview-04-new-page-dark      14 -previewTab=new
+          capture preview-05-library-dark       14 -previewRoute=/library
+          capture preview-06-search-dark        14 -previewRoute=/search
+          capture preview-07-artist-dark        30 "-previewRoute=/search?q=Kweku%20Smoke&type=artist"
+
+      - name: Summarize
+        run: |
+          ls -la captures/
+          shasum -a 256 Musike-Phase3.ipa captures/*.png > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase3-evidence
+          path: |
+            Musike-Phase3.ipa
+            SHA256SUMS.txt
+            captures/
+          retention-days: 30
+          if-no-files-found: error
