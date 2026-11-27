@@ -42,8 +42,10 @@ function HomeHeader() {
   const t = useT();
   const info = useSystem((s) => s.info);
   const attention = needsAttention(info);
+  // Keep this bar fully opaque while sticky: a translucent header lets
+  // scrolling section labels bleed through as ghost letters behind the title.
   return (
-    <header className="safe-top sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg/85 px-4 pt-3 pb-4 backdrop-blur-xl md:bg-surface-1/85 md:px-6 md:pt-6">
+    <header className="safe-top sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg px-4 pt-3 pb-4 backdrop-blur-xl md:bg-surface-1 md:px-6 md:pt-6">
       <h1 className="text-[34px] leading-none font-bold tracking-tight md:text-[40px]">{t.nav.home}</h1>
       <div className="flex items-center gap-1.5">
         <button
@@ -196,7 +198,7 @@ function RecentCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
 
 function Rail({ children }: { children: ReactNode }) {
   return (
-    <div className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
+    <div className="no-scrollbar flex max-w-full min-w-0 snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
       {children}
     </div>
   );
@@ -262,8 +264,10 @@ export default function Home() {
           }
         : null;
 
+  // Clip at the page edge so no card gradient or decorative shadow can escape
+  // past the right side of a rail.
   return (
-    <div className="pb-8">
+    <div className="overflow-x-clip pb-8">
       <HomeHeader />
 
       {status === "loading" && <TrackListSkeleton rows={6} />}
