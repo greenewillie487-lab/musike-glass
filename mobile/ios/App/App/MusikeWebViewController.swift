@@ -321,7 +321,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     /// Builds all sizing states once. Each bucket is a point of capsule height
-    /// (64 -> 52) and scales icon size 22pt -> 14pt and title font 10pt -> 8pt
+    /// (64 -> 52) and scales icon size 22pt -> 14pt and title font 10pt -> 9pt
     /// with the same progress. Normal/selected share the font; only selected is
     /// red. This is setup work, never called from the scroll KVO path.
     private func buildTabSizingStates() {
@@ -330,7 +330,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         for bucket in 0...12 {
             let p = CGFloat(bucket) / 12.0
             let iconSize = 22 - 8 * p
-            let titleSize = 10 - 2 * p
+            let titleSize = 10 - p
             let symbolConfig = UIImage.SymbolConfiguration(pointSize: iconSize, weight: .regular)
 
             let appearance = UITabBarAppearance()
