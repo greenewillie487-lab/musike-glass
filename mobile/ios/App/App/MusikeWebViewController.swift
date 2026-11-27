@@ -272,6 +272,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         activePill.translatesAutoresizingMaskIntoConstraints = false
         activePill.isUserInteractionEnabled = false
         activePill.effect = liquidGlassEffect()
+        activePill.backgroundColor = activeColor.withAlphaComponent(0.42)
+        activePill.contentView.backgroundColor = activeColor.withAlphaComponent(0.18)
         activePill.layer.masksToBounds = true
         activePill.layer.borderWidth = 0.5
         activePill.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
