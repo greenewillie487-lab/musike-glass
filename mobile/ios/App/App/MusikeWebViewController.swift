@@ -115,6 +115,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var tabBarBottomConstraint: NSLayoutConstraint?
     private var tabBarHeightConstraint: NSLayoutConstraint?
     private let compactTitleLabel = UILabel()
+    private let compactTitleBackground = UIView()
     private var compactTitleTopConstraint: NSLayoutConstraint?
     /// Single source of truth for native title/chrome state. Derived from the
     /// active scroll view's contentOffset; no boolean collapse flag and no
@@ -228,6 +229,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         compactTitleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
         compactTitleLabel.textColor = .label
         compactTitleLabel.alpha = 0
+        compactTitleBackground.alpha = 0
+        compactTitleBackground.backgroundColor = .systemBackground
+        compactTitleBackground.isUserInteractionEnabled = false
+        compactTitleBackground.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(compactTitleBackground, belowSubview: compactTitleLabel)
+        NSLayoutConstraint.activate([
+            compactTitleBackground.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            compactTitleBackground.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            compactTitleBackground.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            compactTitleBackground.heightAnchor.constraint(equalToConstant: 44)
+        ])
         compactTitleLabel.isUserInteractionEnabled = false
         compactTitleLabel.accessibilityIdentifier = "native-compact-home-title"
         compactTitleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -981,6 +993,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let titleAlpha = showsTitle ? progress : 0
         compactTitleTopConstraint?.constant = 8 * titleAlpha
         compactTitleLabel.alpha = titleAlpha
+        compactTitleBackground.alpha = titleAlpha
         // One stored height constraint morphs the chrome continuously; the mini
         // player stays visible but fades, following its anchor to tabBar.top.
         tabBarHeightConstraint?.constant = 64 - 12 * progress
