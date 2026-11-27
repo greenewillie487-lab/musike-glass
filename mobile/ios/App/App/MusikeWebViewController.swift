@@ -357,6 +357,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         homeVisible = false
         homeScrollView.isHidden = true
         newPlaceholder.isHidden = false
+        view.bringSubviewToFront(newPlaceholder)
+        view.bringSubviewToFront(tabBar)
+        view.bringSubviewToFront(miniGlass)
+        view.layoutIfNeeded()
         tabBar.isHidden = false
         miniGlass.isHidden = false
     }
