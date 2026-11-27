@@ -97,6 +97,12 @@ export function Lyrics({ track }: { track: Track }) {
   const plain = result?.plainLyrics?.trim() || lines.map((line) => line.text).join("\n");
   const empty = !result || (!lines.length && !plain);
 
+  // While the shared LRCLIB backoff is active, retry is a live countdown and a no-op:
+  // the client already refuses to hit the network until retryAt, so never spin here.
+  const secondsLeft = Math.ceil(retryLeft / 1000);
+  const backoffActive = state === "limited" && secondsLeft > 0;
+  const retryLabel = `${t.retry} ${new Intl.RelativeTimeFormat(lang, { numeric: "always" }).format(secondsLeft, "second")}`;
+
   return (
     <section className="lyrics-view" aria-label={t.title} data-following={following} data-playing={status === "playing"}>
       {state === "loading" ? (
@@ -108,12 +114,13 @@ export function Lyrics({ track }: { track: Track }) {
         <div className="lyrics-state" role="status">
           <ChatTextIcon size={34} /><h3>{t.error}</h3>
           <p>{state === "limited" ? t.limited : t.errorBody}</p>
-          {state === "limited" && retryLeft > 0 && (
-            <p className="lyrics-backoff" aria-live="polite">
-              {new Intl.RelativeTimeFormat(lang, { numeric: "always" }).format(Math.ceil(retryLeft / 1000), "second")}
-            </p>
-          )}
-          <button className="lyrics-pill" onClick={() => setAttempt((n) => n + 1)}>{t.retry}</button>
+          <button
+            className={`lyrics-pill${backoffActive ? " lyrics-backoff" : ""}`}
+            aria-live={backoffActive ? "polite" : undefined}
+            onClick={() => { if (!backoffActive) setAttempt((n) => n + 1); }}
+          >
+            {backoffActive ? retryLabel : t.retry}
+          </button>
         </div>
       ) : result?.instrumental || empty ? (
         <div className="lyrics-state" role="status">

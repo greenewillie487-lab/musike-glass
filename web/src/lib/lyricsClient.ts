@@ -20,9 +20,14 @@ let retryAt = 0;
 
 export class LyricsRateLimit extends Error {}
 
+/** Absolute epoch ms when the shared provider backoff ends, or 0 when requests are allowed. */
+export function getLyricsRetryAt(): number {
+  return retryAt;
+}
+
 /** Milliseconds left in the provider's backoff, or 0 when another request is allowed. */
 export function getLyricsRetryAfter(): number {
-  return Math.max(0, retryAt - Date.now());
+  return Math.max(0, getLyricsRetryAt() - Date.now());
 }
 
 async function request(path: string, signal: AbortSignal): Promise<unknown> {

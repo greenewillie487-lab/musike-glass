@@ -219,7 +219,7 @@ export default function Search() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t.search.placeholder}
-            className="h-12 w-full rounded-full border border-line-strong bg-surface-2 pr-24 pl-12 text-[16px] placeholder:text-fg-3 focus:border-accent focus:bg-surface-1 focus:outline-none md:h-13 [&::-webkit-search-cancel-button]:hidden"
+            className="h-12 w-full rounded-full border border-line-strong bg-surface-2 pr-24 pl-12 text-[16px] placeholder:text-fg-3 focus:border-white/40 focus:bg-surface-1 focus:outline-none md:h-13 [&::-webkit-search-cancel-button]:hidden"
           />
           <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-2">
             {!text && <kbd className="kbd hidden md:inline">/</kbd>}
