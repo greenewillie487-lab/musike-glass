@@ -1054,8 +1054,15 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         lastScrollOffset = 0
         scrollAccumulation = 0
         homeScrollView.setContentOffset(CGPoint(x: 0, y: previewScrollOffset), animated: false)
-        // Preview-only: make the scroll-jump state explicit so the compact title is captured.
-        setChromeCollapsed(true)
+        // Preview-only: make the scroll-jump state explicit after route messages settle.
+        chromeCollapsed = true
+        tabBarHeightConstraint?.constant = 52
+        miniGlass.alpha = 0.42
+        compactTitleTopConstraint?.constant = 8
+        compactTitleLabel.alpha = 1
+        view.bringSubviewToFront(compactTitleLabel)
+        view.bringSubviewToFront(tabBar)
+        view.bringSubviewToFront(miniGlass)
     }
 
     // MARK: - Appearance
