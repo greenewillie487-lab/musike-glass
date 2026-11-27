@@ -8,13 +8,13 @@ private final class NativeGlass {
     weak var host: MusikeWebViewController?
 }
 
-/// One cached, quantised tab sizing state. Icon point size, title font and the
-/// red/secondary tint all come from the same scroll progress that morphs the
-/// capsule 64pt -> 52pt, so the real tab buttons always fit inside the glass.
-private struct TabSizingState {
-    let appearance: UITabBarAppearance
-    let normalImages: [UIImage?]
-    let selectedImages: [UIImage?]
+/// Full-screen chrome container. Passes touches through everywhere except its
+/// real glass children so the web view / home feed below stays interactive.
+private final class ChromeContainerView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
+    }
 }
 
 /// The web app posts its appearance mode here. Native forwards system changes back
@@ -122,12 +122,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let activePillTint = UIView()
     private let newPlaceholder = UIView()
     private var tabBarBottomConstraint: NSLayoutConstraint?
-    private var tabBarHeightConstraint: NSLayoutConstraint?
-    /// 13 cached states (one per point of capsule height, 64...52). Built once,
-    /// never per frame; the scroll master only switches buckets when progress
-    /// actually crosses one, so no appearance/image churn at mid-scroll.
-    private var tabSizingStates: [Int: TabSizingState] = [:]
-    private var currentTabSizingBucket = -1
+    /// One stored container for the whole fixed-size chrome (tab bar + mini
+    /// player). Scroll only translates/fades this unit; no subview is added,
+    /// removed or resized while scrolling.
+    private let chromeContainer = ChromeContainerView()
     private static let tabGlyphs: [(normal: String, selected: String, title: String, key: String)] = [
         ("house", "house", "Home", "home"),
         ("square.grid.2x2", "square.grid.2x2", "New", "new"),
@@ -135,6 +133,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         ("music.note.tv", "music.note.tv", "Library", "library"),
         ("magnifyingglass", "magnifyingglass", "Search", "search")
     ]
+    /// ONE fixed glyph configuration and ONE fixed label font for every scroll
+    /// state. Apple does not rescale tab glyphs/labels as the bar collapses.
+    private static let tabSymbolConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+    private static let tabLabelFont = UIFont.systemFont(ofSize: 10, weight: .medium)
     private let compactTitleLabel = UILabel()
     private let compactTitleBackground = UIView()
     private var compactTitleTopConstraint: NSLayoutConstraint?
@@ -231,11 +233,23 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         // Kill any inherited opaque bar background so colorless glass can refract content.
         tabAppearance.backgroundImage = UIImage()
         tabAppearance.shadowImage = UIImage()
+        // Fixed label font in every layout; red only on the selected icon/label.
+        for layout in [
+            tabAppearance.stackedLayoutAppearance,
+            tabAppearance.inlineLayoutAppearance,
+            tabAppearance.compactInlineLayoutAppearance
+        ] {
+            layout.normal.titleTextAttributes[.font] = Self.tabLabelFont
+            layout.normal.titleTextAttributes[.foregroundColor] = UIColor.secondaryLabel
+            layout.normal.iconColor = .secondaryLabel
+            layout.selected.titleTextAttributes[.font] = Self.tabLabelFont
+            layout.selected.titleTextAttributes[.foregroundColor] = activeColor
+            layout.selected.iconColor = activeColor
+        }
         tabBar.standardAppearance = tabAppearance
         tabBar.scrollEdgeAppearance = tabAppearance
         tabBar.unselectedItemTintColor = .secondaryLabel
         tabBar.layer.backgroundColor = UIColor.clear.cgColor
-        buildTabSizingStates()
 
         installActivePill()
         buildTabBar()
@@ -243,9 +257,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         buildMiniPlayer()
 
         view.addSubview(homeScrollView)
-        view.addSubview(tabBar)
-        view.addSubview(miniGlass)
-        view.insertSubview(newPlaceholder, belowSubview: tabBar)
+        view.addSubview(chromeContainer)
+        chromeContainer.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            chromeContainer.topAnchor.constraint(equalTo: view.topAnchor),
+            chromeContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            chromeContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            chromeContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        chromeContainer.addSubview(tabBar)
+        chromeContainer.addSubview(miniGlass)
+        view.insertSubview(newPlaceholder, belowSubview: chromeContainer)
 
         compactTitleLabel.text = "Home"
         compactTitleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
@@ -255,6 +277,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         compactTitleBackground.backgroundColor = .systemBackground
         compactTitleBackground.isUserInteractionEnabled = false
         compactTitleBackground.translatesAutoresizingMaskIntoConstraints = false
+        compactTitleLabel.isUserInteractionEnabled = false
+        compactTitleLabel.accessibilityIdentifier = "native-compact-home-title"
+        compactTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        // Above homeScrollView, below the glass chrome container.
+        view.insertSubview(compactTitleLabel, belowSubview: chromeContainer)
         view.insertSubview(compactTitleBackground, belowSubview: compactTitleLabel)
         NSLayoutConstraint.activate([
             compactTitleBackground.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -262,11 +289,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             compactTitleBackground.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             compactTitleBackground.heightAnchor.constraint(equalToConstant: 44)
         ])
-        compactTitleLabel.isUserInteractionEnabled = false
-        compactTitleLabel.accessibilityIdentifier = "native-compact-home-title"
-        compactTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        // Above homeScrollView, below the glass chrome.
-        view.insertSubview(compactTitleLabel, belowSubview: tabBar)
 
         let guide = view.safeAreaLayoutGuide
         let bottom = tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8)
@@ -274,7 +296,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let compactTop = compactTitleLabel.topAnchor.constraint(equalTo: guide.topAnchor, constant: 0)
         compactTitleTopConstraint = compactTop
         tabBarBottomConstraint = bottom
-        tabBarHeightConstraint = tabHeight
         NSLayoutConstraint.activate([
             homeScrollView.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
             homeScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
@@ -308,75 +329,15 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         for glyph in Self.tabGlyphs {
             let tabItem = UITabBarItem(
                 title: glyph.title,
-                image: UIImage(systemName: glyph.normal),
-                selectedImage: UIImage(systemName: glyph.selected)
+                image: UIImage(systemName: glyph.normal, withConfiguration: Self.tabSymbolConfig),
+                selectedImage: UIImage(systemName: glyph.selected, withConfiguration: Self.tabSymbolConfig)
             )
             tabItem.tag = tabItems.count
             tabItem.accessibilityIdentifier = "glass-tab-\(glyph.key)"
             tabItems.append(tabItem)
         }
         tabBar.items = tabItems
-        applyTabSizing(progress: scrollProgress)
         setActiveTab(0)
-    }
-
-    /// Builds all sizing states once. Each bucket is a point of capsule height
-    /// (64 -> 52) and scales icon size 22pt -> 14pt and title font 10pt -> 9pt
-    /// with the same progress. Normal/selected share the font; only selected is
-    /// red. This is setup work, never called from the scroll KVO path.
-    private func buildTabSizingStates() {
-        var states: [Int: TabSizingState] = [:]
-        states.reserveCapacity(13)
-        for bucket in 0...12 {
-            let p = CGFloat(bucket) / 12.0
-            let iconSize = 22 - 8 * p
-            let titleSize = 10 - p
-            let symbolConfig = UIImage.SymbolConfiguration(pointSize: iconSize, weight: .regular)
-
-            let appearance = UITabBarAppearance()
-            appearance.configureWithTransparentBackground()
-            // Keep the bar colorless so the glass can refract the feed behind it.
-            appearance.backgroundImage = UIImage()
-            appearance.shadowImage = UIImage()
-
-            let titleFont = UIFont.systemFont(ofSize: titleSize, weight: .medium)
-            for layout in [
-                appearance.stackedLayoutAppearance,
-                appearance.inlineLayoutAppearance,
-                appearance.compactInlineLayoutAppearance
-            ] {
-                layout.normal.titleTextAttributes[.font] = titleFont
-                layout.normal.titleTextAttributes[.foregroundColor] = UIColor.secondaryLabel
-                layout.normal.iconColor = .secondaryLabel
-                layout.selected.titleTextAttributes[.font] = titleFont
-                layout.selected.titleTextAttributes[.foregroundColor] = activeColor
-                layout.selected.iconColor = activeColor
-            }
-
-            states[bucket] = TabSizingState(
-                appearance: appearance,
-                normalImages: Self.tabGlyphs.map { UIImage(systemName: $0.normal, withConfiguration: symbolConfig) },
-                selectedImages: Self.tabGlyphs.map { UIImage(systemName: $0.selected, withConfiguration: symbolConfig) }
-            )
-        }
-        tabSizingStates = states
-    }
-
-    /// Selects a cached state from the exact same continuous progress that
-    /// morphs the capsule and drives the active pill. Inside a bucket this is a
-    /// no-op, so scrolling allocates nothing and never accumulates subviews.
-    private func applyTabSizing(progress: CGFloat) {
-        let bucket = max(0, min(12, Int((progress * 12).rounded())))
-        guard bucket != currentTabSizingBucket,
-              let state = tabSizingStates[bucket],
-              let items = tabBar.items, items.count == Self.tabGlyphs.count else { return }
-        currentTabSizingBucket = bucket
-        tabBar.standardAppearance = state.appearance
-        tabBar.scrollEdgeAppearance = state.appearance
-        for (index, item) in items.enumerated() {
-            item.image = state.normalImages[index]
-            item.selectedImage = state.selectedImages[index]
-        }
     }
 
     /// The selected tab sits in a colorless glass pill behind the real tab
@@ -468,9 +429,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         }
         let maxWidth = max(40, bounds.width / CGFloat(items.count) - 8)
         let width = min(max(40, slot.width * 0.86), maxWidth)
-        // Track the real button frame as the capsule morphs: as the icon/title
-        // scale down with progress, the pill shrinks with them and still covers
-        // the selected content instead of floating in a fixed-height slot.
+        // Tab metrics are fixed at every scroll state, so the highlight keeps
+        // its size and simply tracks the selected button frame.
         let height = max(28, min(slot.height - 14, bounds.height - 8))
         activePill.frame = CGRect(x: slot.midX - width / 2, y: (bounds.height - height) / 2,
                                   width: width, height: height)
@@ -526,8 +486,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         view.bringSubviewToFront(overlay)
-        view.bringSubviewToFront(tabBar)
-        view.bringSubviewToFront(miniGlass)
+        view.bringSubviewToFront(chromeContainer)
         newOverlay = overlay
         tabBar.isHidden = false
         miniGlass.isHidden = false
@@ -1072,14 +1031,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         compactTitleTopConstraint?.constant = 8 * titleAlpha
         compactTitleLabel.alpha = titleAlpha
         compactTitleBackground.alpha = titleAlpha
-        // One stored height constraint morphs the chrome continuously; the mini
-        // player stays visible but fades, following its anchor to tabBar.top.
-        tabBarHeightConstraint?.constant = 64 - 12 * progress
-        // Same progress drives the real tab buttons (icon 22->18, title 10->9)
-        // so they keep fitting the glass capsule at every scroll offset.
-        applyTabSizing(progress: progress)
-        miniGlass.alpha = 1 - 0.58 * progress
-        miniGlass.isUserInteractionEnabled = true
+        // Apple minimizes the whole bar/accessory as ONE unit. Translate and
+        // fade the stored chrome container together; the tab bar, active pill,
+        // buttons and mini-player all move as one. Tab height, glyphs and
+        // labels keep fixed metrics at every scroll position.
+        chromeContainer.transform = CGAffineTransform(translationX: 0, y: 18 * scrollProgress)
+        chromeContainer.alpha = 1 - 0.25 * scrollProgress
         view.layoutIfNeeded()
         layoutActivePill()
     }
