@@ -133,7 +133,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     ]
     /// ONE fixed glyph configuration and ONE fixed label font for every scroll
     /// state. Apple does not rescale tab glyphs/labels as the bar collapses.
-    private static let tabSymbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+    private static let tabSymbolConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .regular)
     private static let tabLabelFont = UIFont.systemFont(ofSize: 10, weight: .medium)
     private let compactTitleLabel = UILabel()
     private let compactTitleBackground = UIView()
@@ -389,9 +389,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let maxWidth = max(40, bounds.width / CGFloat(items.count) - 8)
         let width = min(max(40, slot.width * 0.86), maxWidth)
         // Tab metrics are fixed at every scroll state, so the highlight keeps
-        // its size and simply tracks the selected button frame. Taller pill so
-        // the 18pt glyph + label sit fully inside the glass highlight.
-        let height = max(28, min(slot.height - 8, bounds.height - 6))
+        // its size and simply tracks the selected button frame. Near-full-height
+        // pill so the glyph + label sit fully inside the glass highlight (the
+        // icon stack rides high inside UITabBarButton).
+        let height = max(28, min(slot.height - 4, bounds.height - 4))
         activePill.frame = CGRect(x: slot.midX - width / 2, y: (bounds.height - height) / 2,
                                   width: width, height: height)
         activePill.layer.cornerRadius = height / 2
@@ -814,39 +815,46 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     /// Preview-only: seed REAL listening history so the Home capture has enough
-    /// content to scroll. Plays the first live search result through the web
-    /// app's own play control, then returns Home — the history feature card and
-    /// Recently Played rail are then real data, never fabricated.
+    /// content to scroll. One injected script does the whole sequence with
+    /// in-page retries (same pattern as tapFirstArtistResult): wait for search
+    /// results, click the first "Play <song>" overlay, give playback a beat to
+    /// record history, then return Home. Everything afterwards is real data.
     private func seedListeningHistory() {
+        // Land on a live search first; the injected tick loop below keeps
+        // running across SPA route changes until results render.
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
             self?.navigate(to: "/search?q=Kweku%20Smoke")
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 9) { [weak self] in
-            self?.playFirstSearchResult()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 16) { [weak self] in
-            self?.navigate(to: "/")
-        }
-        // Home re-renders with the seeded history after returning; the scroll
-        // retries must come after that (the unseeded early retries would run
-        // while the app is still on the search page).
-        for delay in [19.0, 22.0, 25.0] {
+        let js = """
+        (function(){
+          var tries = 0, max = 120, clicked = false;
+          function tick(){
+            if (!clicked) {
+              var b = document.querySelector('button[aria-label^="Play "]') ||
+                      document.querySelector('button[aria-label="Play"]');
+              if (b) {
+                b.click();
+                clicked = true;
+                setTimeout(function(){
+                  history.pushState({}, '', '/');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }, 6000);
+                return;
+              }
+            }
+            if (++tries < max) setTimeout(tick, 250);
+          }
+          tick();
+        })();
+        """
+        webView?.evaluateJavaScript(js) { _, _ in }
+        // Scroll retries AFTER the seed window: results click typically lands
+        // by ~15s, +6s playback, then Home re-renders with real history.
+        for delay in [26.0, 30.0, 34.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.applyPreviewScroll()
             }
         }
-    }
-
-    /// Preview-only helper for seedListeningHistory: click the first result's
-    /// "Play <song>" overlay button, exactly what a user tap would hit.
-    private func playFirstSearchResult() {
-        let js = """
-        (function(){
-          var b = document.querySelector('button[aria-label^="Play "]');
-          if (b) b.click();
-        })();
-        """
-        webView?.evaluateJavaScript(js) { _, _ in }
     }
 
     /// Preview-only: scroll the rendered web page itself. The app scrolls its
