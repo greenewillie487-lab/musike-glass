@@ -13,7 +13,7 @@ import type { Genre, GenrePage, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
 import { useUi } from "../stores/ui";
-import "./new.css";
+import "../new.css";
 
 function SeeAll({ to }: { to: string }) {
   const t = useT();
