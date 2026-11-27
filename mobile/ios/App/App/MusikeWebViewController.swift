@@ -759,7 +759,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     func setRoute(_ url: String) {
         if radioSelected && (url == "/" || url.isEmpty) { return }
-        if !newPlaceholder.isHidden { return }
+        if newOverlay != nil || !newPlaceholder.isHidden { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
         currentPath = path
