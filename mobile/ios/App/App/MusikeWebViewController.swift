@@ -994,9 +994,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         compactTitleTopConstraint?.constant = 8 * titleAlpha
         compactTitleLabel.alpha = titleAlpha
         compactTitleBackground.alpha = titleAlpha
-        // Capsule geometry stays fixed so buttons and active pill always align;
-        // only the title strip and mini-player opacity respond to scroll.
-        tabBarHeightConstraint?.constant = 64
+        // One stored height constraint morphs the chrome continuously; the mini
+        // player stays visible but fades, following its anchor to tabBar.top.
+        tabBarHeightConstraint?.constant = 64 - 12 * progress
         miniGlass.alpha = 1 - 0.58 * progress
         miniGlass.isUserInteractionEnabled = true
         view.layoutIfNeeded()
