@@ -22,3 +22,6 @@ server/cache/
 Thumbs.db
 test-results/
 playwright-report/
+
+node_modules/
+**/node_modules/
