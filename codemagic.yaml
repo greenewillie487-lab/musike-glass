@@ -135,7 +135,7 @@ workflows:
           capture preview-04-new-page-dark.png -previewTab=new
           capture preview-05-library-dark.png -previewRoute=/library
           capture preview-06-search-dark.png -previewRoute=/search
-          capture preview-07-artist-dark.png -previewRoute=/search/artist/Tems
+          capture preview-07-artist-dark.png "-previewRoute=/search?q=Kweku%20Smoke&type=artist"
     artifacts:
       - $CM_BUILD_DIR/preview-01-home-dark.png
       - $CM_BUILD_DIR/preview-02-home-scrolled-dark.png

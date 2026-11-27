@@ -146,6 +146,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var previewScrollOffset: CGFloat = 0
     private var previewNewTab = false
     private var previewRoute: String?
+    /// Preview-only: a search-results preview must follow a real artist link
+    /// instead of opening a hard-coded id that may not exist in the catalog.
+    private var previewArtistTap = false
     private var previewLight = false
     private var isObservingScroll = false
 
@@ -773,7 +776,13 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             } else if argument == "-previewTab=new" {
                 previewNewTab = true
             } else if argument.hasPrefix("-previewRoute=") {
-                previewRoute = String(argument.dropFirst("-previewRoute=".count))
+                let route = String(argument.dropFirst("-previewRoute=".count))
+                previewRoute = route
+                // Artist previews land on a real search-results page and then
+                // follow a live artist link. A bare "/search/artist/<id>" can
+                // point at an id the bundled catalog does not have, which
+                // renders the "Invalid artist" empty state.
+                if route.contains("type=artist") { previewArtistTap = true }
             } else if argument == "-previewAppearance=light" {
                 previewLight = true
             }
@@ -796,13 +805,24 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
                 self?.navigate(to: route)
             }
+            if previewArtistTap {
+                // Results render after the route change, and the album/genre
+                // page they lead to needs another beat. The JS retries itself
+                // until a real artist link exists; this delay only makes sure
+                // the page has had time to render before it starts looking.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+                    self?.tapFirstArtistResult()
+                }
+            }
         }
         applyPreviewScroll()
         if previewScrollOffset > 0, !previewNewTab, previewRoute == nil {
-            // Web content is still loading when capacitorDidLoad runs; retry
-            // until the web Home has enough height to scroll. Only the scroll
-            // position is set here — KVO still drives every title/bar value.
-            for delay in [3.0, 6.0] {
+            // Web content is still loading when capacitorDidLoad runs. The page
+            // script re-applies the scroll on load and short timers, and these
+            // native retries cover a slow first paint. Only the scroll position
+            // is set here — the contentOffset KVO still drives every title/bar
+            // value; nothing is pinned directly.
+            for delay in [3.0, 6.0, 9.0] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     self?.applyPreviewScroll()
                 }
@@ -810,12 +830,61 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         }
     }
 
+    /// Preview-only: scroll the rendered web page itself. The app scrolls its
+    /// own <main> scroller (html/body are height:100%), so setting the
+    /// WKWebView scroll view's contentOffset never moves the content. Ask the
+    /// page to scroll with window.scrollTo plus the real scroller; WebKit then
+    /// reports any resulting offset through the contentOffset KVO, which stays
+    /// the single source of truth for native title/chrome state.
     private func applyPreviewScroll() {
         guard previewScrollOffset > 0, !previewNewTab, previewRoute == nil,
               currentPath == "/" else { return }
-        // The harness only moves the web view's scroll view. KVO routes that
-        // offset through applyScrollMaster, the sole writer of title/bar state.
-        webView?.scrollView.setContentOffset(CGPoint(x: 0, y: previewScrollOffset), animated: false)
+        let y = Int(previewScrollOffset.rounded())
+        let js = """
+        (function(){
+          var y = \(y);
+          function scrollPage(){
+            window.scrollTo(0, y);
+            var scroller = document.querySelector('main.scroll-area') || document.querySelector('main');
+            if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+              scroller.scrollTop = y;
+            }
+          }
+          scrollPage();
+          window.addEventListener('load', scrollPage, {once:true});
+          setTimeout(scrollPage, 100);
+          setTimeout(scrollPage, 500);
+        })();
+        """
+        webView?.evaluateJavaScript(js) { _, _ in }
+    }
+
+    /// Preview-only: follow a real artist link so the Artist capture shows a
+    /// catalog artist instead of the "Invalid artist" empty state. Song search
+    /// results have no artist links, so switch to the Albums tab (if needed),
+    /// open an album, then click its real artist link.
+    private func tapFirstArtistResult() {
+        let js = """
+        (function(){
+          var tries = 0, max = 100, switched = false;
+          function tick(){
+            var artist = document.querySelector('a[href^="/search/artist/"]');
+            if (artist) { artist.click(); return; }
+            var album = document.querySelector('a[href^="/search/album/"]') ||
+                        document.querySelector('a[href^="/search/genre/"]');
+            if (album) { album.click(); return; }
+            // Default results are songs (plain text artists). The third result
+            // tab is Albums; its grid links to albums that link to artists.
+            if (!switched) {
+              var tabs = document.querySelectorAll('[role="tab"]');
+              if (tabs.length >= 3) { switched = true; tabs[2].click(); }
+            }
+            if (++tries < max) setTimeout(tick, 250);
+          }
+          tick();
+        })();
+        """
+        webView?.evaluateJavaScript(js) { _, _ in }
     }
 
     // MARK: - Appearance
