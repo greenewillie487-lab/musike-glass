@@ -8,6 +8,15 @@ private final class NativeGlass {
     weak var host: MusikeWebViewController?
 }
 
+/// One cached, quantised tab sizing state. Icon point size, title font and the
+/// red/secondary tint all come from the same scroll progress that morphs the
+/// capsule 64pt -> 52pt, so the real tab buttons always fit inside the glass.
+private struct TabSizingState {
+    let appearance: UITabBarAppearance
+    let normalImages: [UIImage?]
+    let selectedImages: [UIImage?]
+}
+
 /// The web app posts its appearance mode here. Native forwards system changes back
 /// through the exact callback the original bundle already defines.
 private final class AppearanceHandler: NSObject, WKScriptMessageHandler {
@@ -114,6 +123,18 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let newPlaceholder = UIView()
     private var tabBarBottomConstraint: NSLayoutConstraint?
     private var tabBarHeightConstraint: NSLayoutConstraint?
+    /// 13 cached states (one per point of capsule height, 64...52). Built once,
+    /// never per frame; the scroll master only switches buckets when progress
+    /// actually crosses one, so no appearance/image churn at mid-scroll.
+    private var tabSizingStates: [Int: TabSizingState] = [:]
+    private var currentTabSizingBucket = -1
+    private static let tabGlyphs: [(normal: String, selected: String, title: String, key: String)] = [
+        ("house", "house.fill", "Home", "home"),
+        ("square.grid.2x2.fill", "square.grid.2x2.fill", "New", "new"),
+        ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
+        ("music.note.tv.fill", "music.note.tv.fill", "Library", "library"),
+        ("magnifyingglass", "magnifyingglass", "Search", "search")
+    ]
     private let compactTitleLabel = UILabel()
     private let compactTitleBackground = UIView()
     private var compactTitleTopConstraint: NSLayoutConstraint?
@@ -214,6 +235,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBar.scrollEdgeAppearance = tabAppearance
         tabBar.unselectedItemTintColor = .secondaryLabel
         tabBar.layer.backgroundColor = UIColor.clear.cgColor
+        buildTabSizingStates()
 
         installActivePill()
         buildTabBar()
@@ -282,26 +304,79 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func buildTabBar() {
         // Home 0, New 1, Radio 2, Library 3, Search 4.
-        let items: [(String, String, String, String)] = [
-            ("house", "house.fill", "Home", "home"),
-            ("square.grid.2x2.fill", "square.grid.2x2.fill", "New", "new"),
-            ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
-            ("music.note.tv.fill", "music.note.tv.fill", "Library", "library"),
-            ("magnifyingglass", "magnifyingglass", "Search", "search")
-        ]
         var tabItems: [UITabBarItem] = []
-        for item in items {
+        for glyph in Self.tabGlyphs {
             let tabItem = UITabBarItem(
-                title: item.2,
-                image: UIImage(systemName: item.0),
-                selectedImage: UIImage(systemName: item.1)
+                title: glyph.title,
+                image: UIImage(systemName: glyph.normal),
+                selectedImage: UIImage(systemName: glyph.selected)
             )
             tabItem.tag = tabItems.count
-            tabItem.accessibilityIdentifier = "glass-tab-\(item.3)"
+            tabItem.accessibilityIdentifier = "glass-tab-\(glyph.key)"
             tabItems.append(tabItem)
         }
         tabBar.items = tabItems
+        applyTabSizing(progress: scrollProgress)
         setActiveTab(0)
+    }
+
+    /// Builds all sizing states once. Each bucket is a point of capsule height
+    /// (64 -> 52) and scales icon size 22pt -> 18pt and title font 10pt -> 9pt
+    /// with the same progress. Normal/selected share the font; only selected is
+    /// red. This is setup work, never called from the scroll KVO path.
+    private func buildTabSizingStates() {
+        var states: [Int: TabSizingState] = [:]
+        states.reserveCapacity(13)
+        for bucket in 0...12 {
+            let p = CGFloat(bucket) / 12.0
+            let iconSize = 22 - 4 * p
+            let titleSize = 10 - p
+            let symbolConfig = UIImage.SymbolConfiguration(pointSize: iconSize, weight: .regular)
+
+            let appearance = UITabBarAppearance()
+            appearance.configureWithTransparentBackground()
+            // Keep the bar colorless so the glass can refract the feed behind it.
+            appearance.backgroundImage = UIImage()
+            appearance.shadowImage = UIImage()
+
+            let titleFont = UIFont.systemFont(ofSize: titleSize, weight: .medium)
+            for layout in [
+                appearance.stackedLayoutAppearance,
+                appearance.inlineLayoutAppearance,
+                appearance.compactInlineLayoutAppearance
+            ] {
+                layout.normal.titleTextAttributes[.font] = titleFont
+                layout.normal.titleTextAttributes[.foregroundColor] = UIColor.secondaryLabel
+                layout.normal.iconColor = .secondaryLabel
+                layout.selected.titleTextAttributes[.font] = titleFont
+                layout.selected.titleTextAttributes[.foregroundColor] = activeColor
+                layout.selected.iconColor = activeColor
+            }
+
+            states[bucket] = TabSizingState(
+                appearance: appearance,
+                normalImages: Self.tabGlyphs.map { UIImage(systemName: $0.normal, withConfiguration: symbolConfig) },
+                selectedImages: Self.tabGlyphs.map { UIImage(systemName: $0.selected, withConfiguration: symbolConfig) }
+            )
+        }
+        tabSizingStates = states
+    }
+
+    /// Selects a cached state from the exact same continuous progress that
+    /// morphs the capsule and drives the active pill. Inside a bucket this is a
+    /// no-op, so scrolling allocates nothing and never accumulates subviews.
+    private func applyTabSizing(progress: CGFloat) {
+        let bucket = max(0, min(12, Int((progress * 12).rounded())))
+        guard bucket != currentTabSizingBucket,
+              let state = tabSizingStates[bucket],
+              let items = tabBar.items, items.count == Self.tabGlyphs.count else { return }
+        currentTabSizingBucket = bucket
+        tabBar.standardAppearance = state.appearance
+        tabBar.scrollEdgeAppearance = state.appearance
+        for (index, item) in items.enumerated() {
+            item.image = state.normalImages[index]
+            item.selectedImage = state.selectedImages[index]
+        }
     }
 
     /// The selected tab sits in a colorless glass pill behind the real tab
@@ -393,7 +468,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         }
         let maxWidth = max(40, bounds.width / CGFloat(items.count) - 8)
         let width = min(max(40, slot.width * 0.86), maxWidth)
-        let height = bounds.height - 14
+        // Track the real button frame as the capsule morphs: as the icon/title
+        // scale down with progress, the pill shrinks with them and still covers
+        // the selected content instead of floating in a fixed-height slot.
+        let height = max(28, min(slot.height - 14, bounds.height - 8))
         activePill.frame = CGRect(x: slot.midX - width / 2, y: (bounds.height - height) / 2,
                                   width: width, height: height)
         activePill.layer.cornerRadius = height / 2
@@ -997,9 +1075,13 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         // One stored height constraint morphs the chrome continuously; the mini
         // player stays visible but fades, following its anchor to tabBar.top.
         tabBarHeightConstraint?.constant = 64 - 12 * progress
+        // Same progress drives the real tab buttons (icon 22->18, title 10->9)
+        // so they keep fitting the glass capsule at every scroll offset.
+        applyTabSizing(progress: progress)
         miniGlass.alpha = 1 - 0.58 * progress
         miniGlass.isUserInteractionEnabled = true
         view.layoutIfNeeded()
+        layoutActivePill()
     }
 
     override func viewDidLayoutSubviews() {
