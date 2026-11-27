@@ -114,6 +114,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let activePillOverlay = UIView()
     private let newPlaceholder = UIView()
     private var tabBarBottomConstraint: NSLayoutConstraint?
+    private var tabBarHeightConstraint: NSLayoutConstraint?
     private var chromeCollapsed = false
     private var scrollAccumulation: CGFloat = 0
     private var lastScrollOffset: CGFloat = 0
@@ -203,9 +204,13 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBar.tintColor = activeColor
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithTransparentBackground()
+        // Kill any inherited opaque bar background so colorless glass can refract content.
+        tabAppearance.backgroundImage = UIImage()
+        tabAppearance.shadowImage = UIImage()
         tabBar.standardAppearance = tabAppearance
         tabBar.scrollEdgeAppearance = tabAppearance
         tabBar.unselectedItemTintColor = .secondaryLabel
+        tabBar.layer.backgroundColor = UIColor.clear.cgColor
 
         installActivePill()
         buildTabBar()
@@ -219,17 +224,20 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
         let guide = view.safeAreaLayoutGuide
         let bottom = tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8)
+        let tabHeight = tabBar.heightAnchor.constraint(equalToConstant: 64)
         tabBarBottomConstraint = bottom
+        tabBarHeightConstraint = tabHeight
         NSLayoutConstraint.activate([
             homeScrollView.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
             homeScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             homeScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            homeScrollView.bottomAnchor.constraint(equalTo: miniGlass.topAnchor, constant: -8),
+            // Extend beneath both capsules so real chart cards scroll behind the glass.
+            homeScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             bottom,
-            tabBar.heightAnchor.constraint(equalToConstant: 64),
+            tabHeight,
 
             miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
@@ -267,18 +275,20 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         setActiveTab(0)
     }
 
-    /// The selected tab is a translucent red glass pill behind the real tab
+    /// The selected tab sits in a colorless glass pill behind the real tab
     /// button (never a flat rect and never a replacement for UITabBar).
+    /// Its red accent comes only from the selected icon + label.
     private func installActivePill() {
         activePill.translatesAutoresizingMaskIntoConstraints = false
         activePill.isUserInteractionEnabled = false
         activePill.effect = liquidGlassEffect()
-        activePill.backgroundColor = activeColor.withAlphaComponent(0.42)
-        activePill.contentView.backgroundColor = activeColor.withAlphaComponent(0.18)
+        activePill.backgroundColor = .clear
+        activePill.contentView.backgroundColor = .clear
         activePill.layer.masksToBounds = true
         activePill.layer.borderWidth = 0.5
         activePill.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
-        activePillTint.backgroundColor = activeColor.withAlphaComponent(0.62)
+        // Neutral white only: no red/tinted fill. Color comes from artwork behind the glass.
+        activePillTint.backgroundColor = UIColor.white.withAlphaComponent(0.10)
         activePillTint.translatesAutoresizingMaskIntoConstraints = false
         activePill.contentView.addSubview(activePillTint)
         NSLayoutConstraint.activate([
@@ -287,18 +297,23 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             activePillTint.trailingAnchor.constraint(equalTo: activePill.contentView.trailingAnchor),
             activePillTint.bottomAnchor.constraint(equalTo: activePill.contentView.bottomAnchor)
         ])
-        activePillOverlay.backgroundColor = activeColor.withAlphaComponent(0.38)
+        activePillOverlay.backgroundColor = UIColor.white.withAlphaComponent(0.08)
         activePillOverlay.isUserInteractionEnabled = false
         activePillOverlay.layer.masksToBounds = true
         tabBar.addSubview(activePill)
         tabBar.addSubview(activePillOverlay)
-        if let background = tabBar.subviews.first(where: {
+        raisePillAboveTabBackground()
+    }
+
+    /// UIKit can reinsert its bar background on every layout pass. Keep the
+    /// colorless glass layers above it and below the real tab buttons.
+    private func raisePillAboveTabBackground() {
+        let backgroundIndex = tabBar.subviews.firstIndex(where: {
             NSStringFromClass($0.classForCoder).contains("Background")
-        }), let index = tabBar.subviews.firstIndex(of: background) {
-            tabBar.insertSubview(activePill, at: index + 1)
-        } else {
-            tabBar.insertSubview(activePill, at: 0)
-        }
+        })
+        let index = (backgroundIndex ?? -1) + 1
+        tabBar.insertSubview(activePill, at: min(index, tabBar.subviews.count))
+        tabBar.insertSubview(activePillOverlay, at: min(index + 1, tabBar.subviews.count))
     }
 
     private func buildNewPlaceholder() {
@@ -363,6 +378,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         activePillOverlay.frame = activePill.frame
         activePillOverlay.layer.cornerRadius = height / 2
         activePillOverlay.isHidden = false
+        raisePillAboveTabBackground()
         for view in tabBar.subviews where NSStringFromClass(view.classForCoder).contains("UITabBarButton") {
             tabBar.bringSubviewToFront(view)
         }
@@ -528,6 +544,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         homeScrollView.backgroundColor = .systemBackground
         homeScrollView.alwaysBounceVertical = true
         homeScrollView.showsVerticalScrollIndicator = false
+        // mini (56) + gap (8) + tab (64) + gap (8) + home-indicator slack (16)
+        homeScrollView.contentInset.bottom = 152
+        homeScrollView.scrollIndicatorInsets.bottom = 152
 
         homeStack.axis = .vertical
         homeStack.spacing = 24
@@ -943,10 +962,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private func setChromeCollapsed(_ collapsed: Bool) {
         guard collapsed != chromeCollapsed else { return }
         chromeCollapsed = collapsed
-        // One stored constraint owns the whole chrome offset; mini follows the tab bar.
-        tabBarBottomConstraint?.constant = collapsed ? 72 : -8
-        miniGlass.alpha = collapsed ? 0 : 1
-        miniGlass.isUserInteractionEnabled = !collapsed
+        // One stored height constraint morphs the chrome; the mini player stays
+        // visible but faded, and follows via its anchor to tabBar.topAnchor.
+        tabBarHeightConstraint?.constant = collapsed ? 52 : 64
+        miniGlass.alpha = collapsed ? 0.42 : 1
+        miniGlass.isUserInteractionEnabled = true
         UIView.animate(withDuration: 0.22, delay: 0, options: [.beginFromCurrentState], animations: {
             self.view.layoutIfNeeded()
         })
