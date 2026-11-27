@@ -195,7 +195,7 @@ export default function Library() {
   const tileClass = "grid grid-cols-3 gap-x-3 gap-y-4 px-4 md:grid-cols-6 lg:grid-cols-9 md:px-6";
 
   return (
-    <div className="pb-8">
+    <div className="pt-[env(safe-area-inset-top)] pb-8">
       <Header />
 
       {pinned.length > 0 && (

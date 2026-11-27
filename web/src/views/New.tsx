@@ -144,7 +144,7 @@ export default function New() {
   const empty = status === "ready" && features.length === 0 && noGenres;
 
   return (
-    <div className="pb-8">
+    <div className="pt-[env(safe-area-inset-top)] pb-8">
       <header className="safe-top sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg/85 px-4 pt-3 pb-4 backdrop-blur-xl md:bg-surface-1/85 md:px-6 md:pt-6">
         <div className="flex min-w-0 items-center gap-2.5">
           <LogoMark className="size-7 shrink-0 text-accent" />
