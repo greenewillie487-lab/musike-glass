@@ -128,13 +128,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private static let tabGlyphs: [(normal: String, selected: String, title: String, key: String)] = [
         ("house", "house", "Home", "home"),
         ("square.grid.2x2", "square.grid.2x2", "New", "new"),
-        ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
         ("music.quarternote.3", "music.quarternote.3", "Library", "library"),
         ("magnifyingglass", "magnifyingglass", "Search", "search")
     ]
     /// ONE fixed glyph configuration and ONE fixed label font for every scroll
     /// state. Apple does not rescale tab glyphs/labels as the bar collapses.
-    private static let tabSymbolConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+    private static let tabSymbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
     private static let tabLabelFont = UIFont.systemFont(ofSize: 10, weight: .medium)
     private let compactTitleLabel = UILabel()
     private let compactTitleBackground = UIView()
@@ -154,7 +153,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private var appearanceMode = "system"
     private var isPlaying = false
-    private var radioSelected = false
     /// Native glass chrome is shown only while the web app has it enabled.
     private var glassEnabled = true
 
@@ -167,7 +165,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var artworkURL = ""
     private var artworkTask: URLSessionDataTask?
 
-    private let routes = ["/", "/new", "__radio__", "/library", "/search"]
+    private let routes = ["/", "/new", "/library", "/search"]
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -287,7 +285,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         ])
 
         let guide = view.safeAreaLayoutGuide
-        let bottom = tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8)
+        // Anchor to the physical bottom (10pt inset) like Apple's floating
+        // glass bar, not the safe-area bottom, so the capsule does not float
+        // far above the home indicator.
+        let bottom = tabBar.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10)
         let tabHeight = tabBar.heightAnchor.constraint(equalToConstant: 64)
         let compactTop = compactTitleLabel.topAnchor.constraint(equalTo: guide.topAnchor, constant: 0)
         compactTitleTopConstraint = compactTop
@@ -309,7 +310,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     private func buildTabBar() {
-        // Home 0, New 1, Radio 2, Library 3, Search 4.
+        // Home 0, New 1, Library 2, Search 3.
         var tabItems: [UITabBarItem] = []
         for glyph in Self.tabGlyphs {
             let tabItem = UITabBarItem(
@@ -387,8 +388,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let maxWidth = max(40, bounds.width / CGFloat(items.count) - 8)
         let width = min(max(40, slot.width * 0.86), maxWidth)
         // Tab metrics are fixed at every scroll state, so the highlight keeps
-        // its size and simply tracks the selected button frame.
-        let height = max(28, min(slot.height - 14, bounds.height - 8))
+        // its size and simply tracks the selected button frame. Taller pill so
+        // the 18pt glyph + label sit fully inside the glass highlight.
+        let height = max(28, min(slot.height - 8, bounds.height - 6))
         activePill.frame = CGRect(x: slot.midX - width / 2, y: (bounds.height - height) / 2,
                                   width: width, height: height)
         activePill.layer.cornerRadius = height / 2
@@ -545,32 +547,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         let index = item.tag
         guard routes.indices.contains(index) else { return }
-        radioSelected = (index == 2)
-        if routes[index] == "__radio__" {
-            startRadio()
-        } else {
-            navigate(to: routes[index])
-        }
-    }
-
-    /// Radio is a real app action: open the current track's Now Playing sheet
-    /// and press its existing "Start radio" control. No fake page or state flag.
-    private func startRadio() {
-        let js = #"""
-        (function(){
-          var m = document.querySelector('div.fixed.z-20 > div.glass');
-          if (!m) return;
-          var b = m.querySelector('button');
-          if (b) b.click();
-          setTimeout(function(){
-            var d = document.querySelector('[role=dialog][aria-modal=true]');
-            if (!d) return;
-            var r = d.querySelector('button.glass-thin');
-            if (r) r.click();
-          }, 200);
-        })();
-        """#
-        webView?.evaluateJavaScript(js)
+        navigate(to: routes[index])
     }
 
     private func navigate(to route: String) {
@@ -579,7 +556,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     func setRoute(_ url: String) {
-        if radioSelected && (url == "/" || url.isEmpty) { return }
         if (previewNewTab || previewRoute != nil) && (url == "/" || url.isEmpty) { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
@@ -592,9 +568,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         miniGlass.isHidden = sheetOpen
         if sheetOpen { return }
         if path == "/new" { setActiveTab(1); return }
-        if path.hasPrefix("/search") { setActiveTab(4) }
+        if path.hasPrefix("/search") { setActiveTab(3) }
         else if path.hasPrefix("/library") || path.hasPrefix("/favorites") ||
-                path.hasPrefix("/history") || path.hasPrefix("/playlist") { setActiveTab(3) }
+                path.hasPrefix("/history") || path.hasPrefix("/playlist") { setActiveTab(2) }
         else { setActiveTab(0) }
     }
 
@@ -751,7 +727,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         // fade the stored chrome container together; the tab bar, active pill,
         // buttons and mini-player all move as one. Tab height, glyphs and
         // labels keep fixed metrics at every scroll position.
-        chromeContainer.transform = CGAffineTransform(translationX: 0, y: 18 * scrollProgress)
+        // With the bar now 10pt above the physical bottom, a 10pt translate
+        // brings it flush with the edge at full collapse instead of clipping it.
+        chromeContainer.transform = CGAffineTransform(translationX: 0, y: 10 * scrollProgress)
         chromeContainer.alpha = 1 - 0.25 * scrollProgress
         view.layoutIfNeeded()
         layoutActivePill()
