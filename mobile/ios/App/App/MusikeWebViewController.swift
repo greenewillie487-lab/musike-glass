@@ -149,6 +149,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// instead of opening a hard-coded id that may not exist in the catalog.
     private var previewArtistTap = false
     private var previewLight = false
+    private var previewSeedHistory = false
     private var isObservingScroll = false
 
     private var appearanceMode = "system"
@@ -763,6 +764,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                 if route.contains("type=artist") { previewArtistTap = true }
             } else if argument == "-previewAppearance=light" {
                 previewLight = true
+            } else if argument == "-previewSeedHistory" {
+                previewSeedHistory = true
             }
         }
     }
@@ -794,7 +797,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             }
         }
         applyPreviewScroll()
-        if previewScrollOffset > 0, !previewNewTab, previewRoute == nil {
+        if previewSeedHistory {
+            seedListeningHistory()
+        } else if previewScrollOffset > 0, !previewNewTab, previewRoute == nil {
             // Web content is still loading when capacitorDidLoad runs. The page
             // script re-applies the scroll on load and short timers, and these
             // native retries cover a slow first paint. Only the scroll position
@@ -806,6 +811,42 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                 }
             }
         }
+    }
+
+    /// Preview-only: seed REAL listening history so the Home capture has enough
+    /// content to scroll. Plays the first live search result through the web
+    /// app's own play control, then returns Home — the history feature card and
+    /// Recently Played rail are then real data, never fabricated.
+    private func seedListeningHistory() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            self?.navigate(to: "/search?q=Kweku%20Smoke")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 9) { [weak self] in
+            self?.playFirstSearchResult()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 16) { [weak self] in
+            self?.navigate(to: "/")
+        }
+        // Home re-renders with the seeded history after returning; the scroll
+        // retries must come after that (the unseeded early retries would run
+        // while the app is still on the search page).
+        for delay in [19.0, 22.0, 25.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.applyPreviewScroll()
+            }
+        }
+    }
+
+    /// Preview-only helper for seedListeningHistory: click the first result's
+    /// "Play <song>" overlay button, exactly what a user tap would hit.
+    private func playFirstSearchResult() {
+        let js = """
+        (function(){
+          var b = document.querySelector('button[aria-label^="Play "]');
+          if (b) b.click();
+        })();
+        """
+        webView?.evaluateJavaScript(js) { _, _ in }
     }
 
     /// Preview-only: scroll the rendered web page itself. The app scrolls its
