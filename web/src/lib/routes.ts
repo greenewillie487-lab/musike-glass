@@ -1,6 +1,7 @@
 /** Every page's address, in one place. */
 export const paths = {
   home: "/",
+  new: "/new",
   search: "/search",
   searchList: "/search/list",
   genre: (id: string) => `/search/genre/${encodeURIComponent(id)}`,

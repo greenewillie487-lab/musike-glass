@@ -167,7 +167,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var artworkURL = ""
     private var artworkTask: URLSessionDataTask?
 
-    private let routes = ["/", "__new__", "__radio__", "/library", "/search"]
+    private let routes = ["/", "/new", "__radio__", "/library", "/search"]
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -826,12 +826,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let index = item.tag
         guard routes.indices.contains(index) else { return }
         radioSelected = (index == 2)
-        if index == 1 {
-            showNewPlaceholder()
-        } else if routes[index] == "__radio__" {
+        if routes[index] == "__radio__" {
             hideNewPlaceholder()
             startRadio()
         } else {
+            homeVisible = false
+            homeScrollView.isHidden = true
             hideNewPlaceholder()
             navigate(to: routes[index])
         }
@@ -1073,7 +1073,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         }
         if previewNewTab {
             setActiveTab(1)
-            showNewPlaceholder()
+            homeVisible = false
+            homeScrollView.isHidden = true
+            hideNewPlaceholder()
+            navigate(to: "/new")
         }
         applyPreviewScroll()
     }

@@ -28,6 +28,7 @@ import Collection from "./views/Collection";
 import Genre from "./views/Genre";
 import Home from "./views/Home";
 import Library from "./views/Library";
+import New from "./views/New";
 import Search from "./views/Search";
 
 const SHEET_HASH = `#${NOW_PLAYING_HASH}`;
@@ -123,6 +124,7 @@ export default function App() {
           ) : (
             <Routes>
               <Route path={paths.home} element={<Home />} />
+              <Route path="/new" element={<New />} />
               <Route path={paths.search} element={<Search />} />
               <Route path={paths.searchList} element={<BatchSearch />} />
               <Route path="/search/genre/:id" element={<Genre />} />
