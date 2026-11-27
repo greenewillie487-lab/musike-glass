@@ -299,12 +299,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let title = UILabel()
         title.text = "New"
         title.font = .systemFont(ofSize: 34, weight: .bold)
-        title.textColor = .label
+        title.textColor = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
         title.textAlignment = .center
         let subtitle = UILabel()
         subtitle.text = "Built in Phase 3"
         subtitle.font = .systemFont(ofSize: 15, weight: .regular)
-        subtitle.textColor = .secondaryLabel
+        subtitle.textColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor.white.withAlphaComponent(0.75) : UIColor.black.withAlphaComponent(0.65) }
         subtitle.textAlignment = .center
         let stack = UIStackView(arrangedSubviews: [title, subtitle])
         stack.axis = .vertical
@@ -787,8 +787,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     func setGlassEnabled(_ enabled: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.miniGlass.isHidden = !enabled
-            self.tabBar.isHidden = !enabled
+            let placeholderVisible = !self.newPlaceholder.isHidden
+            self.miniGlass.isHidden = !enabled && !placeholderVisible
+            self.tabBar.isHidden = !enabled && !placeholderVisible
             self.homeVisible = enabled ? false : (self.currentPath == "/")
             self.homeScrollView.isHidden = !self.homeVisible
             if enabled { self.hideNewPlaceholder() }
