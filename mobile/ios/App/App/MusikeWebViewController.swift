@@ -231,6 +231,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         compactTitleLabel.isUserInteractionEnabled = false
         compactTitleLabel.accessibilityIdentifier = "native-compact-home-title"
         compactTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        // Above homeScrollView, below the glass chrome.
         view.insertSubview(compactTitleLabel, belowSubview: tabBar)
 
         let guide = view.safeAreaLayoutGuide
@@ -632,6 +633,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         addHomeSection("Made for You", items: Array(chartItems.prefix(20)))
         addHomeSection("New Releases", items: Array(newer.prefix(20)))
         addHomeSection("Top Charts", items: Array(chartItems.prefix(30)))
+        // Three more shelves from the same real feed snapshot: enough height for
+        // an artwork row to sit directly behind both glass capsules at any scroll.
+        addHomeSection("Recently Played", items: Array(chartItems.prefix(20)))
+        addHomeSection("Top Albums", items: Array(newer.prefix(20)))
+        addHomeSection("More for You", items: Array(chartItems.reversed().prefix(20)))
         applyPreviewScroll()
     }
 
@@ -965,6 +971,13 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let offset = scroll.contentOffset.y
         let delta = offset - lastScrollOffset
         lastScrollOffset = offset
+        // Absolute-position guard: deep scroll always morphs the chrome, so the
+        // pinned compact title fades in even on a jump (preview or fast flick).
+        if offset >= 120 {
+            scrollAccumulation = 160
+            setChromeCollapsed(true)
+            return
+        }
         if offset <= 8 {
             scrollAccumulation = 0
             setChromeCollapsed(false)
@@ -1046,6 +1059,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func applyPreviewScroll() {
         guard previewScrollOffset > 0, homeVisible, !previewNewTab else { return }
+        // The absolute-offset branch in observeValue drives the compact title.
         // Let the one-time jump count as real downward scroll so collapse is visible.
         lastScrollOffset = 0
         scrollAccumulation = 0
