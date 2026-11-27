@@ -357,6 +357,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         homeVisible = false
         homeScrollView.isHidden = true
         newPlaceholder.isHidden = false
+        webView?.isHidden = true
         view.bringSubviewToFront(newPlaceholder)
         view.bringSubviewToFront(tabBar)
         view.bringSubviewToFront(miniGlass)
@@ -367,6 +368,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func hideNewPlaceholder() {
         newPlaceholder.isHidden = true
+        webView?.isHidden = false
     }
 
     private func buildMiniPlayer() {
