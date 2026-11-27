@@ -335,7 +335,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         activePill.isHidden = false
         let buttons = tabBar.subviews.filter { NSStringFromClass($0.classForCoder).contains("UITabBarButton") }
         let slot: CGRect
-        if buttons.count == items.count, buttons.indices.contains(index), buttons[index].width > 0 {
+        if buttons.count == items.count, buttons.indices.contains(index), buttons[index].frame.width > 0 {
             slot = buttons[index].frame
         } else {
             let slotWidth = bounds.width / CGFloat(items.count)
