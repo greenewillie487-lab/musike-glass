@@ -432,8 +432,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         miniArtwork.layer.cornerRadius = 10
         if idle {
             let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
-            miniArtwork.image = UIImage(systemName: "music.note", withConfiguration: config)
-            miniArtwork.tintColor = .secondaryLabel
+            miniArtwork.image = UIImage(systemName: "music.note", withConfiguration: config)?.withRenderingMode(.alwaysTemplate)
+            miniArtwork.tintColor = .label
             miniArtwork.backgroundColor = UIColor.secondarySystemFill
             miniArtwork.contentMode = .center
         } else {
@@ -617,8 +617,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func installBridgeScript() {
         let css = """
-        nav.fixed.inset-x-3[class*="bottom-[calc(10px"] { display: none !important; }
-        div.fixed.inset-x-3[class*="bottom-[calc(84px"] { display: none !important; }
+        nav.safe-bottom.fixed.inset-x-0.bottom-0 { display: none !important; }
+        div.fixed.inset-x-2[class*="bottom-[calc(72px"] { display: none !important; }
         main { padding-bottom: 160px !important; }
         """
         let source = """
@@ -912,8 +912,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func applyPreviewScroll() {
         guard previewScrollOffset > 0, homeVisible, !previewNewTab else { return }
-        // Seed the hysteresis baseline so the preview jump alone cannot collapse chrome.
-        lastScrollOffset = previewScrollOffset
+        // Let the one-time jump count as real downward scroll so collapse is visible.
+        lastScrollOffset = 0
+        scrollAccumulation = 0
         homeScrollView.setContentOffset(CGPoint(x: 0, y: previewScrollOffset), animated: false)
     }
 
