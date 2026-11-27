@@ -130,7 +130,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         ("house", "house", "Home", "home"),
         ("square.grid.2x2", "square.grid.2x2", "New", "new"),
         ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
-        ("music.note.tv", "music.note.tv", "Library", "library"),
+        ("music.quarternote.3", "music.quarternote.3", "Library", "library"),
         ("magnifyingglass", "magnifyingglass", "Search", "search")
     ]
     /// ONE fixed glyph configuration and ONE fixed label font for every scroll
@@ -873,8 +873,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
-        refreshScrollMaster()
         if homeVisible { hideNewPlaceholder() }
+        // A route change always starts with the compact title fully hidden.
+        // Route through the scroll master so it stays the only runtime writer.
+        applyScrollMaster(offsetY: 0)
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
         if sheetOpen { return }
@@ -1026,10 +1028,14 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// The one scroll master: a pure, continuous mapping from contentOffset to
     /// every title/bar value. No accumulation, no thresholds, no boolean cliff
     /// and no animation that could fight successive KVO callbacks.
+    /// SOLE writer of compactTitleLabel/compactTitleBackground alpha. progress
+    /// is clamped to 0 at scroll-top, so progress == 0 always means alpha == 0
+    /// (no faint "Home" behind the status bar).
     private func applyScrollMaster(offsetY: CGFloat) {
         let progress = max(0, min(1, (offsetY - 40) / 120))
         scrollProgress = progress
         let showsTitle = homeVisible && newOverlay == nil && newPlaceholder.isHidden
+        // progress == 0 => 0; hidden routes/overlays are also 0.
         let titleAlpha = showsTitle ? progress : 0
         compactTitleTopConstraint?.constant = 8 * titleAlpha
         compactTitleLabel.alpha = titleAlpha
