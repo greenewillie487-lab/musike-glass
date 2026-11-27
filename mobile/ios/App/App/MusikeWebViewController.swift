@@ -115,6 +115,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let newPlaceholder = UIView()
     private var tabBarBottomConstraint: NSLayoutConstraint?
     private var tabBarHeightConstraint: NSLayoutConstraint?
+    private let compactTitleLabel = UILabel()
+    private var compactTitleTopConstraint: NSLayoutConstraint?
     private var chromeCollapsed = false
     private var scrollAccumulation: CGFloat = 0
     private var lastScrollOffset: CGFloat = 0
@@ -222,9 +224,20 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         view.addSubview(miniGlass)
         view.insertSubview(newPlaceholder, belowSubview: tabBar)
 
+        compactTitleLabel.text = "Home"
+        compactTitleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
+        compactTitleLabel.textColor = .label
+        compactTitleLabel.alpha = 0
+        compactTitleLabel.isUserInteractionEnabled = false
+        compactTitleLabel.accessibilityIdentifier = "native-compact-home-title"
+        compactTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(compactTitleLabel, belowSubview: tabBar)
+
         let guide = view.safeAreaLayoutGuide
         let bottom = tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8)
         let tabHeight = tabBar.heightAnchor.constraint(equalToConstant: 64)
+        let compactTop = compactTitleLabel.topAnchor.constraint(equalTo: guide.topAnchor, constant: 0)
+        compactTitleTopConstraint = compactTop
         tabBarBottomConstraint = bottom
         tabBarHeightConstraint = tabHeight
         NSLayoutConstraint.activate([
@@ -243,6 +256,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             miniGlass.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -8),
             miniGlass.heightAnchor.constraint(equalToConstant: 56),
+
+            compactTop,
+            compactTitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
 
             newPlaceholder.topAnchor.constraint(equalTo: view.topAnchor),
             newPlaceholder.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -433,6 +449,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         newOverlay = overlay
         tabBar.isHidden = false
         miniGlass.isHidden = false
+        updateCompactTitle(animated: false)
     }
 
     private func hideNewPlaceholder() {
@@ -440,6 +457,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         newOverlay = nil
         newPlaceholder.isHidden = true
         webView?.isHidden = false
+        updateCompactTitle(animated: false)
     }
 
     private func buildMiniPlayer() {
@@ -807,6 +825,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
+        updateCompactTitle(animated: false)
         if homeVisible { hideNewPlaceholder() }
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
@@ -967,9 +986,25 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBarHeightConstraint?.constant = collapsed ? 52 : 64
         miniGlass.alpha = collapsed ? 0.42 : 1
         miniGlass.isUserInteractionEnabled = true
+        updateCompactTitle(animated: true)
         UIView.animate(withDuration: 0.22, delay: 0, options: [.beginFromCurrentState], animations: {
             self.view.layoutIfNeeded()
         })
+    }
+
+    /// One stored top constraint and one alpha drive the pinned compact title.
+    private func updateCompactTitle(animated: Bool) {
+        let visible = chromeCollapsed && homeVisible && newOverlay == nil && newPlaceholder.isHidden
+        compactTitleTopConstraint?.constant = visible ? 8 : 0
+        let apply = {
+            self.compactTitleLabel.alpha = visible ? 1 : 0
+            self.view.layoutIfNeeded()
+        }
+        if animated {
+            UIView.animate(withDuration: 0.22, delay: 0, options: [.beginFromCurrentState], animations: apply)
+        } else {
+            apply()
+        }
     }
 
     override func viewDidLayoutSubviews() {

@@ -128,7 +128,7 @@ workflows:
           }
           xcrun simctl ui "$UDID" appearance dark || true
           capture preview-01-home-dark.png
-          capture preview-02-home-scrolled-dark.png -previewScroll=320
+          capture preview-02-home-scrolled-dark.png -previewScroll=520
           xcrun simctl ui "$UDID" appearance light || true
           capture preview-03-home-light.png -previewAppearance=light
           xcrun simctl ui "$UDID" appearance dark || true
