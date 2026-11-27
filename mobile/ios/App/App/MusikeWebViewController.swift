@@ -116,9 +116,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var tabBarHeightConstraint: NSLayoutConstraint?
     private let compactTitleLabel = UILabel()
     private var compactTitleTopConstraint: NSLayoutConstraint?
-    private var chromeCollapsed = false
-    private var scrollAccumulation: CGFloat = 0
-    private var lastScrollOffset: CGFloat = 0
+    /// Single source of truth for native title/chrome state. Derived from the
+    /// active scroll view's contentOffset; no boolean collapse flag and no
+    /// accumulated delta, so the title tracks position continuously.
+    private var scrollProgress: CGFloat = 0
     private var previewScrollOffset: CGFloat = 0
     private var previewNewTab = false
     private var previewLight = false
@@ -440,7 +441,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         newOverlay = overlay
         tabBar.isHidden = false
         miniGlass.isHidden = false
-        updateCompactTitle(animated: false)
+        refreshScrollMaster()
     }
 
     private func hideNewPlaceholder() {
@@ -448,7 +449,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         newOverlay = nil
         newPlaceholder.isHidden = true
         webView?.isHidden = false
-        updateCompactTitle(animated: false)
+        refreshScrollMaster()
     }
 
     private func buildMiniPlayer() {
@@ -821,7 +822,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
-        updateCompactTitle(animated: false)
+        refreshScrollMaster()
         if homeVisible { hideNewPlaceholder() }
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
@@ -949,7 +950,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         gesture.setTranslation(.zero, in: miniGlass)
     }
 
-    // MARK: - Native scroll collapse (KVO on WKWebView.scrollView, no JS)
+    // MARK: - Native scroll master (single source of truth)
+
+    /// KVO reports which scroll moved; it never decides chrome state itself.
     override func observeValue(forKeyPath keyPath: String?, of object: Any?,
                                change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         guard keyPath == "contentOffset", let scroll = object as? UIScrollView else {
@@ -958,56 +961,32 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         }
         let activeScroll = homeVisible ? homeScrollView : webView?.scrollView
         guard scroll === activeScroll else { return }
-        let offset = scroll.contentOffset.y
-        let delta = offset - lastScrollOffset
-        lastScrollOffset = offset
-        // Absolute-position guard: deep scroll always morphs the chrome, so the
-        // pinned compact title fades in even on a jump (preview or fast flick).
-        if offset >= 120 {
-            scrollAccumulation = 160
-            setChromeCollapsed(true)
-            return
-        }
-        if offset <= 8 {
-            scrollAccumulation = 0
-            setChromeCollapsed(false)
-            return
-        }
-        scrollAccumulation = max(0, min(scrollAccumulation + delta, 160))
-        if !chromeCollapsed && scrollAccumulation >= 60 {
-            setChromeCollapsed(true)
-        } else if chromeCollapsed && scrollAccumulation <= 12 {
-            setChromeCollapsed(false)
-        }
+        applyScrollMaster(offsetY: scroll.contentOffset.y)
     }
 
-    private func setChromeCollapsed(_ collapsed: Bool) {
-        guard collapsed != chromeCollapsed else { return }
-        chromeCollapsed = collapsed
-        // One stored height constraint morphs the chrome; the mini player stays
-        // visible but faded, and follows via its anchor to tabBar.topAnchor.
-        tabBarHeightConstraint?.constant = collapsed ? 52 : 64
-        miniGlass.alpha = collapsed ? 0.42 : 1
+    /// Re-read the active scroll after a route/overlay change, so the title is
+    /// gated by the same offset pipeline rather than a separate boolean flag.
+    private func refreshScrollMaster() {
+        let scroll = homeVisible ? homeScrollView : webView?.scrollView
+        applyScrollMaster(offsetY: scroll?.contentOffset.y ?? 0)
+    }
+
+    /// The one scroll master: a pure, continuous mapping from contentOffset to
+    /// every title/bar value. No accumulation, no thresholds, no boolean cliff
+    /// and no animation that could fight successive KVO callbacks.
+    private func applyScrollMaster(offsetY: CGFloat) {
+        let progress = max(0, min(1, (offsetY - 40) / 120))
+        scrollProgress = progress
+        let showsTitle = homeVisible && newOverlay == nil && newPlaceholder.isHidden
+        let titleAlpha = showsTitle ? progress : 0
+        compactTitleTopConstraint?.constant = 8 * titleAlpha
+        compactTitleLabel.alpha = titleAlpha
+        // One stored height constraint morphs the chrome continuously; the mini
+        // player stays visible but fades, following its anchor to tabBar.top.
+        tabBarHeightConstraint?.constant = 64 - 12 * progress
+        miniGlass.alpha = 1 - 0.58 * progress
         miniGlass.isUserInteractionEnabled = true
-        updateCompactTitle(animated: true)
-        UIView.animate(withDuration: 0.22, delay: 0, options: [.beginFromCurrentState], animations: {
-            self.view.layoutIfNeeded()
-        })
-    }
-
-    /// One stored top constraint and one alpha drive the pinned compact title.
-    private func updateCompactTitle(animated: Bool) {
-        let visible = chromeCollapsed && homeVisible && newOverlay == nil && newPlaceholder.isHidden
-        compactTitleTopConstraint?.constant = visible ? 8 : 0
-        let apply = {
-            self.compactTitleLabel.alpha = visible ? 1 : 0
-            self.view.layoutIfNeeded()
-        }
-        if animated {
-            UIView.animate(withDuration: 0.22, delay: 0, options: [.beginFromCurrentState], animations: apply)
-        } else {
-            apply()
-        }
+        view.layoutIfNeeded()
     }
 
     override func viewDidLayoutSubviews() {
@@ -1049,20 +1028,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func applyPreviewScroll() {
         guard previewScrollOffset > 0, homeVisible, !previewNewTab else { return }
-        // The absolute-offset branch in observeValue drives the compact title.
-        // Let the one-time jump count as real downward scroll so collapse is visible.
-        lastScrollOffset = 0
-        scrollAccumulation = 0
+        // The harness only moves the real scroll view. KVO routes that offset
+        // through applyScrollMaster, which is the sole writer of title/bar state.
         homeScrollView.setContentOffset(CGPoint(x: 0, y: previewScrollOffset), animated: false)
-        // Preview-only: make the scroll-jump state explicit after route messages settle.
-        chromeCollapsed = true
-        tabBarHeightConstraint?.constant = 52
-        miniGlass.alpha = 0.42
-        compactTitleTopConstraint?.constant = 8
-        compactTitleLabel.alpha = 1
-        view.bringSubviewToFront(compactTitleLabel)
-        view.bringSubviewToFront(tabBar)
-        view.bringSubviewToFront(miniGlass)
     }
 
     // MARK: - Appearance
