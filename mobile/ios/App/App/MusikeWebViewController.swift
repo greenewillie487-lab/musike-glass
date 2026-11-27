@@ -821,36 +821,41 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// record history, then return Home. Everything afterwards is real data.
     private func seedListeningHistory() {
         // Land on a live search first; the injected tick loop below keeps
-        // running across SPA route changes until results render.
+        // running across SPA route changes until results render. The loop is
+        // injected at +5s — evaluateJavaScript called before the first page
+        // commits runs in the provisional document whose timers die on load.
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
             self?.navigate(to: "/search?q=Kweku%20Smoke")
         }
-        let js = """
-        (function(){
-          var tries = 0, max = 120, clicked = false;
-          function tick(){
-            if (!clicked) {
-              var b = document.querySelector('button[aria-label^="Play "]') ||
-                      document.querySelector('button[aria-label="Play"]');
-              if (b) {
-                b.click();
-                clicked = true;
-                setTimeout(function(){
-                  history.pushState({}, '', '/');
-                  window.dispatchEvent(new PopStateEvent('popstate'));
-                }, 6000);
-                return;
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self else { return }
+            let js = """
+            (function(){
+              var tries = 0, max = 120, clicked = false;
+              function tick(){
+                if (!clicked) {
+                  var b = document.querySelector('button[aria-label^="Play "]') ||
+                          document.querySelector('button[aria-label="Play"]');
+                  if (b) {
+                    b.click();
+                    clicked = true;
+                    setTimeout(function(){
+                      history.pushState({}, '', '/');
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                    }, 6000);
+                    return;
+                  }
+                }
+                if (++tries < max) setTimeout(tick, 250);
               }
-            }
-            if (++tries < max) setTimeout(tick, 250);
-          }
-          tick();
-        })();
-        """
-        webView?.evaluateJavaScript(js) { _, _ in }
+              tick();
+            })();
+            """
+            self.webView?.evaluateJavaScript(js) { _, _ in }
+        }
         // Scroll retries AFTER the seed window: results click typically lands
-        // by ~15s, +6s playback, then Home re-renders with real history.
-        for delay in [26.0, 30.0, 34.0] {
+        // by ~20s (loop starts at +5s), +6s playback, then Home re-renders.
+        for delay in [30.0, 34.0, 38.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.applyPreviewScroll()
             }
