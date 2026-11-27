@@ -374,28 +374,36 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         homeScrollView.isHidden = true
 
         let overlay = UIView()
-        overlay.backgroundColor = .systemBackground
+        overlay.backgroundColor = UIColor {traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.08, green: 0.08, blue: 0.09, alpha: 1)
+                : UIColor.systemBackground
+        }
         overlay.translatesAutoresizingMaskIntoConstraints = false
+
         let title = UILabel()
         title.text = "New"
         title.font = .systemFont(ofSize: 34, weight: .bold)
         title.textColor = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
         title.textAlignment = .center
+        title.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(title)
+
         let subtitle = UILabel()
         subtitle.text = "Built in Phase 3"
         subtitle.font = .systemFont(ofSize: 15, weight: .regular)
         subtitle.textColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor.white.withAlphaComponent(0.75) : UIColor.black.withAlphaComponent(0.65) }
         subtitle.textAlignment = .center
-        let stack = UIStackView(arrangedSubviews: [title, subtitle])
-        stack.axis = .vertical
-        stack.spacing = 8
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        overlay.addSubview(stack)
+        subtitle.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(subtitle)
+
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: overlay.centerYAnchor)
+            title.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            title.centerYAnchor.constraint(equalTo: overlay.centerYAnchor, constant: -14),
+            subtitle.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 8)
         ])
+
         view.addSubview(overlay)
         NSLayoutConstraint.activate([
             overlay.topAnchor.constraint(equalTo: view.topAnchor),
