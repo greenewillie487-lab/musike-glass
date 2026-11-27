@@ -1,10 +1,10 @@
 import { ChatTextIcon, MusicNotesIcon } from "@phosphor-icons/react";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useT } from "../i18n";
+import { useI18n, useT } from "../i18n";
 import { formatTime } from "../lib/format";
 import { activeLineAt, parseLrc, type LyricsRecord } from "../lib/lyrics";
-import { loadLyrics, LyricsRateLimit } from "../lib/lyricsClient";
+import { getLyricsRetryAfter, loadLyrics, LyricsRateLimit } from "../lib/lyricsClient";
 import type { Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 
@@ -21,6 +21,7 @@ export function LyricsBackdrop({ track }: { track: Track }) {
 /** Keyed by track at the call site: old lyrics and scroll state never flash on the next song. */
 export function Lyrics({ track }: { track: Track }) {
   const t = useT().lyrics;
+  const lang = useI18n((s) => s.lang);
   const position = usePlayer((s) => s.position);
   const status = usePlayer((s) => s.status);
   const mediaKind = usePlayer((s) => s.mediaKind);
@@ -30,6 +31,7 @@ export function Lyrics({ track }: { track: Track }) {
   const [state, setState] = useState<"loading" | "ready" | "error" | "limited">("loading");
   const [attempt, setAttempt] = useState(0);
   const [following, setFollowing] = useState(true);
+  const [retryLeft, setRetryLeft] = useState(0);
   const [offset, setOffset] = useState(0);
   const [adjusting, setAdjusting] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -47,6 +49,19 @@ export function Lyrics({ track }: { track: Track }) {
   }, [track, attempt]);
 
   useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current); }, []);
+
+  // LRCLIB's Retry-After is global, so mirror the shared backoff instead of hammering it.
+  useEffect(() => {
+    if (state !== "limited") {
+      setRetryLeft(0);
+      return;
+    }
+    const tick = () => setRetryLeft(getLyricsRetryAfter());
+    tick();
+    const timer = setInterval(tick, 500);
+    return () => clearInterval(timer);
+  }, [state, attempt, lang]);
+
   const lines = useMemo(() => parseLrc(result?.syncedLyrics ?? ""), [result]);
   // A music video can have an intro/edit different from the album recording. Don't pretend it is synced.
   const synced = lines.length > 0 && mediaKind !== "video";
@@ -93,6 +108,11 @@ export function Lyrics({ track }: { track: Track }) {
         <div className="lyrics-state" role="status">
           <ChatTextIcon size={34} /><h3>{t.error}</h3>
           <p>{state === "limited" ? t.limited : t.errorBody}</p>
+          {state === "limited" && retryLeft > 0 && (
+            <p className="lyrics-backoff" aria-live="polite">
+              {new Intl.RelativeTimeFormat(lang, { numeric: "always" }).format(Math.ceil(retryLeft / 1000), "second")}
+            </p>
+          )}
           <button className="lyrics-pill" onClick={() => setAttempt((n) => n + 1)}>{t.retry}</button>
         </div>
       ) : result?.instrumental || empty ? (

@@ -20,6 +20,11 @@ let retryAt = 0;
 
 export class LyricsRateLimit extends Error {}
 
+/** Milliseconds left in the provider's backoff, or 0 when another request is allowed. */
+export function getLyricsRetryAfter(): number {
+  return Math.max(0, retryAt - Date.now());
+}
+
 async function request(path: string, signal: AbortSignal): Promise<unknown> {
   signal.throwIfAborted();
   if (Date.now() < retryAt) throw new LyricsRateLimit();

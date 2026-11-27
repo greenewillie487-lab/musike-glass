@@ -1,5 +1,7 @@
 import {
+  AirplayIcon,
   HeartIcon,
+  InfinityIcon,
   MusicNotesIcon,
   PauseIcon,
   PlayIcon,
@@ -11,6 +13,7 @@ import {
   SpeakerHighIcon,
   SpeakerLowIcon,
   SpeakerXIcon,
+  StarIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -21,8 +24,13 @@ import { cn, formatTime } from "../lib/format";
 import type { Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useLibrary } from "../stores/library";
+import { useUi } from "../stores/ui";
 import { IconButton, PlayDisc } from "./IconButton";
 import { Slider } from "./Slider";
+
+/** Frosted glass used by the Now Playing sheet's quick actions and icon circles. */
+export const glassCircle = "bg-fg/10 ring-1 ring-fg/15 backdrop-blur-xl shadow-[inset_0_1px_0_rgb(255_255_255/0.18)]";
+export const glassPill = "bg-fg/8 ring-1 ring-fg/12 backdrop-blur-xl shadow-[inset_0_1px_0_rgb(255_255_255/0.14)]";
 
 export function PlayPauseIcon({ size = 22 }: { size?: number }) {
   const status = usePlayer((s) => s.status);
@@ -32,7 +40,19 @@ export function PlayPauseIcon({ size = 22 }: { size?: number }) {
   return status === "playing" ? <PauseIcon size={size} weight="fill" /> : <PlayIcon size={size} weight="fill" />;
 }
 
-export function Transport({ big = false }: { big?: boolean }) {
+export function Transport({
+  big = false,
+  minimal = false,
+  discClassName,
+  discPx,
+}: {
+  big?: boolean;
+  /** Hide shuffle/repeat when they live in the quick-action pill row instead. */
+  minimal?: boolean;
+  discClassName?: string;
+  /** Override the play disc diameter (short landscape screens use a smaller disc). */
+  discPx?: number;
+}) {
   const t = useT();
   const p = usePlayer(
     useShallow((s) => ({
@@ -53,41 +73,46 @@ export function Transport({ big = false }: { big?: boolean }) {
   const iconSize = big ? 26 : 19;
 
   return (
-    <div className={cn("flex items-center", big ? "justify-between" : "gap-2")}>
-      <IconButton
-        label={p.shuffle ? t.player.shuffleOn : t.player.shuffleOff}
-        active={p.shuffle}
-        size={big ? "lg" : "sm"}
-        onClick={p.toggleShuffle}
-        disabled={!hasTrack}
-      >
-        <ShuffleIcon size={big ? 22 : 17} />
-        {p.shuffle && <span className="absolute bottom-0.5 size-1 rounded-full bg-accent-text" />}
-      </IconButton>
+    <div className={cn("flex items-center", big ? (minimal ? "justify-around" : "justify-between") : "gap-2")}>
+      {!minimal && (
+        <IconButton
+          label={p.shuffle ? t.player.shuffleOn : t.player.shuffleOff}
+          active={p.shuffle}
+          size={big ? "lg" : "sm"}
+          onClick={p.toggleShuffle}
+          disabled={!hasTrack}
+        >
+          <ShuffleIcon size={big ? 22 : 17} />
+          {p.shuffle && <span className="absolute bottom-0.5 size-1 rounded-full bg-accent-text" />}
+        </IconButton>
+      )}
       <IconButton label={t.player.previous} size={big ? "lg" : "md"} onClick={p.prev} disabled={!hasTrack} className="text-fg">
         <SkipBackIcon size={iconSize} weight="fill" />
       </IconButton>
       <PlayDisc
         label={p.status === "playing" ? t.common.pause : t.common.play}
-        px={big ? 72 : 40}
+        px={discPx ?? (big ? 72 : 40)}
         onClick={p.toggle}
         disabled={!hasTrack}
+        className={discClassName}
       >
         <PlayPauseIcon size={big ? 30 : 20} />
       </PlayDisc>
       <IconButton label={t.player.next} size={big ? "lg" : "md"} onClick={p.next} disabled={!hasTrack} className="text-fg">
         <SkipForwardIcon size={iconSize} weight="fill" />
       </IconButton>
-      <IconButton
-        label={repeatLabel}
-        active={p.repeat !== "off"}
-        size={big ? "lg" : "sm"}
-        onClick={p.cycleRepeat}
-        disabled={!hasTrack}
-      >
-        <RepeatGlyph size={big ? 22 : 17} />
-        {p.repeat !== "off" && <span className="absolute bottom-0.5 size-1 rounded-full bg-accent-text" />}
-      </IconButton>
+      {!minimal && (
+        <IconButton
+          label={repeatLabel}
+          active={p.repeat !== "off"}
+          size={big ? "lg" : "sm"}
+          onClick={p.cycleRepeat}
+          disabled={!hasTrack}
+        >
+          <RepeatGlyph size={big ? 22 : 17} />
+          {p.repeat !== "off" && <span className="absolute bottom-0.5 size-1 rounded-full bg-accent-text" />}
+        </IconButton>
+      )}
     </div>
   );
 }
@@ -124,7 +149,7 @@ export function Scrubber({ touch = false, className }: { touch?: boolean; classN
   );
 }
 
-export function Volume({ className }: { className?: string }) {
+export function Volume({ className, wide = false }: { className?: string; wide?: boolean }) {
   const t = useT();
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
@@ -133,19 +158,128 @@ export function Volume({ className }: { className?: string }) {
   const level = muted ? 0 : volume;
   const Glyph = level === 0 ? SpeakerXIcon : level < 0.5 ? SpeakerLowIcon : SpeakerHighIcon;
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex items-center", wide ? "gap-2" : "gap-1", className)}>
       <IconButton label={muted ? t.player.unmute : t.player.mute} size="sm" onClick={toggleMute}>
-        <Glyph size={18} />
+        <Glyph size={wide ? 20 : 18} />
       </IconButton>
-      <Slider label={t.player.volume} value={level} max={1} step={0.05} live onChange={setVolume} valueText={(v) => `${Math.round(v * 100)}%`} className="w-24" />
+      <Slider
+        label={t.player.volume}
+        value={level}
+        max={1}
+        step={0.05}
+        live
+        onChange={setVolume}
+        valueText={(v) => `${Math.round(v * 100)}%`}
+        className={wide ? "min-w-0 flex-1" : "w-24"}
+      />
+      {wide && <SpeakerHighIcon size={18} className="shrink-0 text-fg-3" aria-hidden="true" />}
     </div>
   );
 }
 
-export function FavoriteButton({ track, size = "md" }: { track: Track | null; size?: "sm" | "md" | "lg" }) {
+type MediaPicker = HTMLMediaElement & {
+  webkitShowPlaybackTargetPicker?: () => void;
+  remote?: { prompt?: () => Promise<void> | void };
+};
+
+/** AirPlay uses the platform picker when available; elsewhere it reports that no output is available. */
+export function AirplayButton({ className, large = false }: { className?: string; large?: boolean }) {
+  const toast = useUi((s) => s.toast);
+  const open = () => {
+    const media = document.querySelector<MediaPicker>("audio, video");
+    if (media?.webkitShowPlaybackTargetPicker) return media.webkitShowPlaybackTargetPicker();
+    if (media?.remote?.prompt) return void media.remote.prompt();
+    toast("AirPlay", "info");
+  };
+  return (
+    <button
+      type="button"
+      aria-label="AirPlay"
+      title="AirPlay"
+      onClick={open}
+      className={cn(large ? "size-11" : "size-9", "grid shrink-0 place-items-center rounded-full text-fg-2 transition-colors hover:text-fg", className)}
+    >
+      <AirplayIcon size={19} />
+    </button>
+  );
+}
+
+/** The four frosted quick actions above the track list in the Now Playing sheet. */
+export function QuickActions({ className }: { className?: string }) {
+  const t = useT();
+  const p = usePlayer(
+    useShallow((s) => ({
+      hasQueue: s.queue.length > 0,
+      shuffle: s.shuffle,
+      repeat: s.repeat,
+      autoRadio: s.autoRadio,
+      toggleShuffle: s.toggleShuffle,
+      cycleRepeat: s.cycleRepeat,
+      setAutoRadio: s.setAutoRadio,
+    })),
+  );
+  const RepeatGlyph = p.repeat === "one" ? RepeatOnceIcon : RepeatIcon;
+  const repeatLabel = { off: t.player.repeatOff, all: t.player.repeatAll, one: t.player.repeatOne }[p.repeat];
+  const pill = (on: boolean) =>
+    cn(
+      "grid h-9 min-w-0 flex-1 place-items-center rounded-full transition-colors duration-200",
+      glassPill,
+      on ? "bg-fg/20 text-fg" : "text-fg-2 hover:bg-fg/15 hover:text-fg",
+    );
+
+  return (
+    <div role="group" aria-label={t.player.mode} className={cn("flex w-full items-center gap-2", className)}>
+      <button
+        type="button"
+        aria-label={p.shuffle ? t.player.shuffleOn : t.player.shuffleOff}
+        aria-pressed={p.shuffle}
+        disabled={!p.hasQueue}
+        onClick={p.toggleShuffle}
+        className={pill(p.shuffle)}
+      >
+        <ShuffleIcon size={18} />
+      </button>
+      <button
+        type="button"
+        aria-label={repeatLabel}
+        aria-pressed={p.repeat !== "off"}
+        disabled={!p.hasQueue}
+        onClick={p.cycleRepeat}
+        className={pill(p.repeat !== "off")}
+      >
+        <RepeatGlyph size={18} />
+      </button>
+      <button
+        type="button"
+        aria-label={t.queue.autoRadio}
+        aria-pressed={p.autoRadio}
+        title={t.queue.autoRadio}
+        onClick={() => p.setAutoRadio(!p.autoRadio)}
+        className={pill(p.autoRadio)}
+      >
+        <InfinityIcon size={20} />
+      </button>
+      <AirplayButton className={cn("flex-1", glassPill)} />
+    </div>
+  );
+}
+
+export function FavoriteButton({
+  track,
+  size = "md",
+  star = false,
+  glass = false,
+}: {
+  track: Track | null;
+  size?: "sm" | "md" | "lg";
+  /** Apple Music uses a star for the current song; other surfaces keep the heart. */
+  star?: boolean;
+  glass?: boolean;
+}) {
   const isFavorite = useLibrary((s) => !!track && s.favorites.some((t) => t.id === track.id));
   const toggle = useLibrary((s) => s.toggleFavorite);
   const t = useT();
+  const Glyph = star ? StarIcon : HeartIcon;
   return (
     <IconButton
       label={isFavorite ? t.common.removeFromFavorites : t.common.addToFavorites}
@@ -153,8 +287,9 @@ export function FavoriteButton({ track, size = "md" }: { track: Track | null; si
       size={size}
       disabled={!track}
       onClick={() => track && void toggle(track)}
+      className={glass ? cn(glassCircle, isFavorite ? "text-fg" : "text-fg-2 hover:text-fg") : undefined}
     >
-      <HeartIcon size={size === "lg" ? 24 : 19} weight={isFavorite ? "fill" : "regular"} />
+      <Glyph size={size === "lg" ? 24 : 19} weight={isFavorite ? "fill" : "regular"} />
     </IconButton>
   );
 }

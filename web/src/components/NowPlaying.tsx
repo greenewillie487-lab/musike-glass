@@ -1,6 +1,7 @@
 import {
   CaretDownIcon,
   ChatTextIcon,
+  DotsThreeIcon,
   MagnifyingGlassIcon,
   QueueIcon,
   RadioIcon,
@@ -8,15 +9,15 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { useT } from "../i18n";
+import { useI18n, useT } from "../i18n";
 import { cn } from "../lib/format";
 import type { Track } from "../lib/types";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi, type PanelTab } from "../stores/ui";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
+import { AirplayButton, FavoriteButton, glassCircle, ModeSwitch, QuickActions, Scrubber, Transport, Volume } from "./Controls";
 import { IconButton } from "./IconButton";
 import { Lyrics, LyricsBackdrop } from "./Lyrics";
 import { QueueList } from "./Queue";
@@ -73,18 +74,42 @@ function Stage({ track, slot, className }: { track: Track; slot: number; classNa
   );
 }
 
-function TrackHeading({ track, large = false }: { track: Track; large?: boolean }) {
+function TrackHeading({
+  track,
+  large = false,
+  chrome = false,
+}: {
+  track: Track;
+  large?: boolean;
+  /** Star + more circles, as in the Apple Music Now Playing header. */
+  chrome?: boolean;
+}) {
   const statusText = useStatusText();
   const status = usePlayer((s) => s.status);
+  const openMenu = useUi((s) => s.openMenu);
+  const t = useT();
+  const more = (e: MouseEvent<HTMLButtonElement>) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    openMenu({ track, x: box.right, y: box.bottom });
+  };
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex min-w-0 items-center gap-3">
       <div className="min-w-0 flex-1">
         <h2 className={cn("truncate font-semibold tracking-tight", large ? "text-[22px] leading-tight" : "text-lg")}>{track.title}</h2>
         <p className={cn("truncate", large ? "text-base" : "text-sm", status === "error" ? "text-danger" : "text-fg-2")}>
           {statusText ?? [track.artist, track.album].filter(Boolean).join(" · ")}
         </p>
       </div>
-      <FavoriteButton track={track} size={large ? "lg" : "md"} />
+      {chrome ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <FavoriteButton track={track} size="sm" star glass />
+          <IconButton label={t.trackList.moreFor(track.title)} className={glassCircle} onClick={more}>
+            <DotsThreeIcon size={20} weight="bold" />
+          </IconButton>
+        </div>
+      ) : (
+        <FavoriteButton track={track} size={large ? "lg" : "md"} />
+      )}
     </div>
   );
 }
@@ -101,7 +126,7 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
     return <p className="px-2 py-16 text-center text-sm text-fg-2">{t.nowPlaying.playSomething}</p>;
   }
   if (tab === "lyrics") return (
-    <div className="lyrics-panel lyrics-theme">
+    <div className="lyrics-panel" data-theme="dark">
       <LyricsBackdrop track={track} />
       <div className="relative z-10 px-4 pt-5"><TrackHeading track={track} /></div>
       <Lyrics key={track.id} track={track} />
@@ -237,6 +262,18 @@ export function PanelDrawer() {
   );
 }
 
+/** Short landscape phones need a tighter control column beside the artwork. */
+function useLandscape() {
+  const [landscape, setLandscape] = useState(() => window.matchMedia("(orientation: landscape)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: landscape)");
+    const update = () => setLandscape(mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return landscape;
+}
+
 /** Full-screen Now Playing for phones. Drag down (or Back) to close. */
 export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const track = usePlayer(selectCurrent);
@@ -244,6 +281,10 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
   const drag = useDragControls();
   const [view, setView] = useState<"player" | "queue" | "lyrics">("player");
   const t = useT();
+  const lang = useI18n((s) => s.lang);
+  const landscape = useLandscape();
+  const heading = (view === "lyrics" ? t.lyrics.title : t.nowPlaying.title).toLocaleUpperCase(lang);
+  const toggleQueue = () => setView(view === "queue" ? "player" : "queue");
 
   return createPortal(
     <AnimatePresence onExitComplete={() => setView("player")}>
@@ -264,7 +305,8 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
           onDragEnd={(_, info) => {
             if (info.offset.y > 120 || info.velocity.y > 700) onClose();
           }}
-          className={cn("fixed inset-0 z-40 flex flex-col overflow-hidden bg-bg md:hidden", view === "lyrics" && "lyrics-theme")}
+          data-theme={view === "lyrics" ? "dark" : undefined}
+          className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-bg md:hidden"
         >
           {view === "lyrics" ? <LyricsBackdrop track={track} /> : <><img
             src={track.thumb}
@@ -275,19 +317,23 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
           <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-bg/70 to-bg" />
           </>}
 
-          <div className="overlay-top relative flex min-h-0 flex-1 flex-col px-5">
-            <div className="flex h-14 shrink-0 touch-none items-center justify-between" onPointerDown={(e) => { if (!(e.target as HTMLElement).closest("button")) drag.start(e); }}>
-              <IconButton label={t.common.close} onClick={onClose} className="-ml-2 text-fg">
-                <CaretDownIcon size={24} />
+          <div className="overlay-top relative flex min-h-0 flex-1 flex-col px-4 landscape:px-6">
+            <div className="flex h-12 shrink-0 touch-none items-center justify-between landscape:h-10" onPointerDown={(e) => { if (!(e.target as HTMLElement).closest("button")) drag.start(e); }}>
+              <IconButton label={t.common.close} size="sm" onClick={onClose} className={cn(glassCircle, "-ml-1 text-fg")}>
+                <CaretDownIcon size={22} />
               </IconButton>
-              <span className="text-xs font-semibold tracking-[0.12em] text-fg-2">{view === "lyrics" ? t.lyrics.title.toLocaleUpperCase() : t.nowPlaying.title}</span>
+              <div className="flex flex-col items-center gap-1">
+                <span aria-hidden="true" className="h-1 w-9 rounded-full bg-fg-3/60" />
+                <span className="text-[10px] font-semibold tracking-[0.16em] text-fg-2">{heading}</span>
+              </div>
               <IconButton
                 label={view === "queue" ? t.nowPlaying.backToPlayer : t.nowPlaying.showQueue}
                 active={view === "queue"}
-                onClick={() => setView(view === "queue" ? "player" : "queue")}
-                className="-mr-2"
+                size="sm"
+                onClick={toggleQueue}
+                className={cn(glassCircle, "-mr-1")}
               >
-                <QueueIcon size={22} />
+                <QueueIcon size={19} />
               </IconButton>
             </div>
 
@@ -302,7 +348,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                 <Lyrics key={track.id} track={track} />
                 <div className="lyrics-sheet-controls">
                   <Scrubber touch />
-                  <Transport big />
+                  <Transport big discClassName="lyrics-play-disc" />
                   <div className="flex justify-center pt-2">
                     <IconButton label={t.lyrics.hide} active aria-pressed={true} onClick={() => setView("player")} className="lyrics-toggle">
                       <ChatTextIcon size={23} weight="fill" />
@@ -315,18 +361,41 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                 <QueueList />
               </div>
             ) : (
-              <div className="flex flex-1 flex-col justify-evenly gap-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
-                <div className="touch-none" onPointerDown={(e) => drag.start(e)}>
-                  <Stage track={track} slot={SLOT.sheet} className="max-w-[min(100%,46dvh)]" />
+              <div className="scroll-area flex min-h-0 flex-1 flex-col justify-between gap-2 overflow-y-auto pb-[calc(12px+env(safe-area-inset-bottom))] landscape:flex-row landscape:items-center landscape:gap-4 landscape:overflow-hidden landscape:pb-2">
+                <div className="flex shrink-0 touch-none justify-center landscape:w-[42%] landscape:max-w-[420px]" onPointerDown={(e) => drag.start(e)}>
+                  <Stage
+                    track={track}
+                    slot={SLOT.sheet}
+                    className="max-w-[min(100%,35dvh)] landscape:max-h-[76dvh] landscape:max-w-none"
+                  />
                 </div>
-                <div className="flex flex-col gap-4">
-                  <TrackHeading track={track} large />
-                  <Scrubber touch />
-                  <Transport big />
-                  <ModeSwitch className="justify-center" />
-                  <div className="flex justify-center">
-                    <IconButton label={t.lyrics.show} aria-pressed={false} onClick={() => setView("lyrics")}>
-                      <ChatTextIcon size={23} />
+                <div className="scroll-area flex min-h-0 flex-1 flex-col justify-between gap-2 landscape:max-h-full landscape:justify-start landscape:gap-[3px] landscape:overflow-y-auto landscape:rounded-[20px] landscape:bg-fg/5 landscape:p-2 landscape:ring-1 landscape:ring-fg/10">
+                  <TrackHeading track={track} large={!landscape} chrome />
+                  <QuickActions />
+                  <div className="landscape:-my-1"><ModeSwitch className="justify-center" /></div>
+                  <div className="flex flex-col gap-1.5 landscape:gap-1">
+                    <Scrubber touch />
+                    <Transport big minimal discPx={landscape ? 56 : 72} />
+                    <Volume wide />
+                  </div>
+                  <div className="flex items-center justify-around pt-1 landscape:pt-0">
+                    <IconButton
+                      label={t.lyrics.show}
+                      size={landscape ? "md" : "lg"}
+                      aria-pressed={false}
+                      onClick={() => setView("lyrics")}
+                      className={glassCircle}
+                    >
+                      <ChatTextIcon size={22} />
+                    </IconButton>
+                    <AirplayButton large={!landscape} className={glassCircle} />
+                    <IconButton
+                      label={t.nowPlaying.showQueue}
+                      size={landscape ? "md" : "lg"}
+                      onClick={() => setView("queue")}
+                      className={glassCircle}
+                    >
+                      <QueueIcon size={22} />
                     </IconButton>
                   </div>
                 </div>
