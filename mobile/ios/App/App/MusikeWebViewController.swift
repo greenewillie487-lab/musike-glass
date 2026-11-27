@@ -111,6 +111,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var progressWidthConstraint: NSLayoutConstraint?
     private let activePill = UIVisualEffectView(frame: .zero)
     private let activePillTint = UIView()
+    private let activePillOverlay = UIView()
     private let newPlaceholder = UIView()
     private var tabBarBottomConstraint: NSLayoutConstraint?
     private var chromeCollapsed = false
@@ -286,7 +287,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             activePillTint.trailingAnchor.constraint(equalTo: activePill.contentView.trailingAnchor),
             activePillTint.bottomAnchor.constraint(equalTo: activePill.contentView.bottomAnchor)
         ])
+        activePillOverlay.backgroundColor = activeColor.withAlphaComponent(0.38)
+        activePillOverlay.isUserInteractionEnabled = false
+        activePillOverlay.layer.masksToBounds = true
         tabBar.addSubview(activePill)
+        tabBar.addSubview(activePillOverlay)
         if let background = tabBar.subviews.first(where: {
             NSStringFromClass($0.classForCoder).contains("Background")
         }), let index = tabBar.subviews.firstIndex(of: background) {
@@ -334,6 +339,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         guard let items = tabBar.items, let selected = tabBar.selectedItem,
               let index = items.firstIndex(where: { $0 === selected }) else {
             activePill.isHidden = true
+            activePillOverlay.isHidden = true
             return
         }
         let bounds = tabBar.bounds
@@ -354,6 +360,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                                   width: width, height: height)
         activePill.layer.cornerRadius = height / 2
         activePillTint.layer.cornerRadius = height / 2
+        activePillOverlay.frame = activePill.frame
+        activePillOverlay.layer.cornerRadius = height / 2
+        activePillOverlay.isHidden = false
+        for view in tabBar.subviews where NSStringFromClass(view.classForCoder).contains("UITabBarButton") {
+            tabBar.bringSubviewToFront(view)
+        }
     }
 
     private func showNewPlaceholder() {
