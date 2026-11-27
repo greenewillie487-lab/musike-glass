@@ -633,6 +633,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private func buildHomeView() {
         homeScrollView.translatesAutoresizingMaskIntoConstraints = false
         homeScrollView.backgroundColor = .systemBackground
+        homeScrollView.clipsToBounds = true
+        homeScrollView.layer.masksToBounds = true
         homeScrollView.alwaysBounceVertical = true
         homeScrollView.showsVerticalScrollIndicator = false
         // mini (56) + gap (8) + tab (64) + gap (8) + home-indicator slack (16)
