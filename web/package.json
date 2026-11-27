@@ -4,6 +4,8 @@
   "version": "1.5.1",
   "type": "module",
   "scripts": {
+    "test:lyrics": "node --experimental-strip-types --test tests/lyrics.test.ts",
+    "test:lyrics-ui": "playwright test",
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "build:native": "tsc --noEmit -p tsconfig.native.json && vite build --mode native",
@@ -25,6 +27,7 @@
     "zustand": "5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",

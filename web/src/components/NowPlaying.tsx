@@ -1,5 +1,6 @@
 import {
   CaretDownIcon,
+  ChatTextIcon,
   MagnifyingGlassIcon,
   QueueIcon,
   RadioIcon,
@@ -17,6 +18,7 @@ import { useUi, type PanelTab } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
 import { IconButton } from "./IconButton";
+import { Lyrics, LyricsBackdrop } from "./Lyrics";
 import { QueueList } from "./Queue";
 import { SLOT, VideoSlot } from "./Video";
 
@@ -98,6 +100,13 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
   if (!track) {
     return <p className="px-2 py-16 text-center text-sm text-fg-2">{t.nowPlaying.playSomething}</p>;
   }
+  if (tab === "lyrics") return (
+    <div className="lyrics-panel lyrics-theme">
+      <LyricsBackdrop track={track} />
+      <div className="relative z-10 px-4 pt-5"><TrackHeading track={track} /></div>
+      <Lyrics key={track.id} track={track} />
+    </div>
+  );
   const nextUp = queue[index + 1];
   return (
     <div className="flex flex-col gap-5 px-1 pb-4">
@@ -134,6 +143,7 @@ function PanelTabs({ tab, onTab }: { tab: PanelTab; onTab: (t: PanelTab) => void
       {(
         [
           ["playing", t.nowPlaying.tabPlaying],
+          ["lyrics", t.lyrics.title],
           ["queue", t.nowPlaying.tabQueue],
         ] as const
       ).map(([id, label]) => (
@@ -144,7 +154,7 @@ function PanelTabs({ tab, onTab }: { tab: PanelTab; onTab: (t: PanelTab) => void
           aria-selected={tab === id}
           onClick={() => onTab(id)}
           className={cn(
-            "h-9 rounded-full px-4 text-sm font-medium transition-colors",
+            "h-9 rounded-full px-3 text-sm font-medium transition-colors",
             tab === id ? "bg-surface-4 text-fg" : "text-fg-2 hover:text-fg",
           )}
         >
@@ -170,7 +180,7 @@ export function SidePanel() {
             <XIcon size={18} />
           </IconButton>
         </div>
-        <div className="scroll-area flex-1 overflow-y-auto px-2">
+        <div className={cn("min-h-0 flex-1", tab === "lyrics" ? "overflow-hidden" : "scroll-area overflow-y-auto px-2")}>
           <PanelBody tab={tab} slot={SLOT.panel} />
         </div>
       </div>
@@ -215,7 +225,7 @@ export function PanelDrawer() {
                   <XIcon size={18} />
                 </IconButton>
               </div>
-              <div className="scroll-area flex-1 overflow-y-auto px-2">
+              <div className={cn("min-h-0 flex-1", tab === "lyrics" ? "overflow-hidden" : "scroll-area overflow-y-auto px-2")}>
                 <PanelBody tab={tab} slot={SLOT.panel} />
               </div>
             </div>
@@ -232,7 +242,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
   const track = usePlayer(selectCurrent);
   const reduce = useReducedMotion();
   const drag = useDragControls();
-  const [view, setView] = useState<"player" | "queue">("player");
+  const [view, setView] = useState<"player" | "queue" | "lyrics">("player");
   const t = useT();
 
   return createPortal(
@@ -254,22 +264,23 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
           onDragEnd={(_, info) => {
             if (info.offset.y > 120 || info.velocity.y > 700) onClose();
           }}
-          className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-bg md:hidden"
+          className={cn("fixed inset-0 z-40 flex flex-col overflow-hidden bg-bg md:hidden", view === "lyrics" && "lyrics-theme")}
         >
-          <img
+          {view === "lyrics" ? <LyricsBackdrop track={track} /> : <><img
             src={track.thumb}
             alt=""
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 h-1/2 w-full scale-125 object-cover opacity-25 blur-3xl"
           />
           <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-bg/70 to-bg" />
+          </>}
 
-          <div className="overlay-top relative flex flex-1 flex-col px-5">
-            <div className="flex h-14 touch-none items-center justify-between" onPointerDown={(e) => drag.start(e)}>
+          <div className="overlay-top relative flex min-h-0 flex-1 flex-col px-5">
+            <div className="flex h-14 shrink-0 touch-none items-center justify-between" onPointerDown={(e) => { if (!(e.target as HTMLElement).closest("button")) drag.start(e); }}>
               <IconButton label={t.common.close} onClick={onClose} className="-ml-2 text-fg">
                 <CaretDownIcon size={24} />
               </IconButton>
-              <div className="mx-auto mt-0 h-1 w-10 rounded-full bg-fg-3/50" />
+              <span className="text-xs font-semibold tracking-[0.12em] text-fg-2">{view === "lyrics" ? t.lyrics.title.toLocaleUpperCase() : t.nowPlaying.title}</span>
               <IconButton
                 label={view === "queue" ? t.nowPlaying.backToPlayer : t.nowPlaying.showQueue}
                 active={view === "queue"}
@@ -280,7 +291,26 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
               </IconButton>
             </div>
 
-            {view === "queue" ? (
+            {view === "lyrics" ? (
+              <div className="lyrics-sheet-content">
+                <div className="flex shrink-0 items-center gap-3 pb-3 pt-1">
+                  <button type="button" aria-label={t.nowPlaying.backToPlayer} onClick={() => setView("player")} className="shrink-0 rounded-lg">
+                    <Artwork src={track.thumb} className="size-12 rounded-lg shadow-lg" />
+                  </button>
+                  <div className="min-w-0 flex-1"><TrackHeading track={track} /></div>
+                </div>
+                <Lyrics key={track.id} track={track} />
+                <div className="lyrics-sheet-controls">
+                  <Scrubber touch />
+                  <Transport big />
+                  <div className="flex justify-center pt-2">
+                    <IconButton label={t.lyrics.hide} active aria-pressed={true} onClick={() => setView("player")} className="lyrics-toggle">
+                      <ChatTextIcon size={23} weight="fill" />
+                    </IconButton>
+                  </div>
+                </div>
+              </div>
+            ) : view === "queue" ? (
               <div className="scroll-area -mx-3 flex-1 overflow-y-auto pb-6">
                 <QueueList />
               </div>
@@ -294,6 +324,11 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   <ModeSwitch className="justify-center" />
+                  <div className="flex justify-center">
+                    <IconButton label={t.lyrics.show} aria-pressed={false} onClick={() => setView("lyrics")}>
+                      <ChatTextIcon size={23} />
+                    </IconButton>
+                  </div>
                 </div>
               </div>
             )}
