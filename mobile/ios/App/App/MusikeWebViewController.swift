@@ -202,9 +202,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBar.tintColor = activeColor
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithTransparentBackground()
-        if #available(iOS 26, *) {
-            tabAppearance.backgroundEffect = UIGlassEffect(style: .regular)
-        }
         tabBar.standardAppearance = tabAppearance
         tabBar.scrollEdgeAppearance = tabAppearance
         tabBar.unselectedItemTintColor = .secondaryLabel
