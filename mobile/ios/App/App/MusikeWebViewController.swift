@@ -160,6 +160,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private let activeColor = UIColor(red: 0.98, green: 0.14, blue: 0.24, alpha: 1.0)
     private let homeScrollView = UIScrollView()
+    /// Opaque cover for the status-bar strip (view.top .. safeArea.top). The web
+    /// view stays alive behind the native Home overlay, so without this its
+    /// web "Home" title ghosts through above homeScrollView's safe-area origin.
+    private let statusBarCover = UIView()
     private let homeStack = UIStackView()
     private var chartItems: [[String: Any]] = []
     private var displayItems: [[String: Any]] = []
@@ -256,6 +260,21 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         buildTabBar()
         buildNewPlaceholder()
         buildMiniPlayer()
+
+        // Cover the status-bar strip above homeScrollView so web content cannot
+        // ghost through behind the native Home overlay. Added before the native
+        // Home views so it sits above the webView but below homeScrollView/chrome.
+        statusBarCover.backgroundColor = .systemBackground
+        statusBarCover.isUserInteractionEnabled = false
+        statusBarCover.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(statusBarCover)
+        NSLayoutConstraint.activate([
+            statusBarCover.topAnchor.constraint(equalTo: view.topAnchor),
+            statusBarCover.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            statusBarCover.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            statusBarCover.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor)
+        ])
+        statusBarCover.isHidden = true
 
         view.addSubview(homeScrollView)
         view.addSubview(chromeContainer)
@@ -447,6 +466,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         hideNewPlaceholder()
         homeVisible = false
         homeScrollView.isHidden = true
+        statusBarCover.isHidden = true
 
         let overlay = UIView()
         overlay.backgroundColor = UIColor {traits in
@@ -702,10 +722,14 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let scroller = UIScrollView()
         scroller.showsHorizontalScrollIndicator = false
         scroller.translatesAutoresizingMaskIntoConstraints = false
+        // Clip overflow so a neighbouring card's label/artwork cannot bleed past
+        // either edge of the rail (stray "S" at left, artwork fragment at right).
+        scroller.clipsToBounds = true
+        scroller.layer.masksToBounds = true
         scroller.addSubview(row)
         row.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            row.topAnchor.constraint(equalTo: scroller.topAnchor),
+            row.topAnchor.constraint(equalTo: scroller.contentLayoutGuide.topAnchor),
             row.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
             row.trailingAnchor.constraint(equalTo: scroller.contentLayoutGuide.trailingAnchor),
             row.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
@@ -772,6 +796,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             .trimmingCharacters(in: .whitespaces)
         homeVisible = false
         homeScrollView.isHidden = true
+        statusBarCover.isHidden = true
         navigate(to: "/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&type=song")
     }
 
@@ -833,6 +858,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         } else {
             homeVisible = false
             homeScrollView.isHidden = true
+            statusBarCover.isHidden = true
             hideNewPlaceholder()
             navigate(to: routes[index])
         }
@@ -873,6 +899,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
+        statusBarCover.isHidden = !homeVisible
         if homeVisible { hideNewPlaceholder() }
         // A route change always starts with the compact title fully hidden.
         // Route through the scroll master so it stays the only runtime writer.
@@ -936,6 +963,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             self.tabBar.isHidden = !enabled && !placeholderVisible
             self.homeVisible = enabled ? false : (self.currentPath == "/")
             self.homeScrollView.isHidden = !self.homeVisible
+            self.statusBarCover.isHidden = !self.homeVisible
             if enabled { self.hideNewPlaceholder() }
             if !enabled {
                 self.miniTitle.text = "Not Playing"
@@ -1090,6 +1118,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             else { setActiveTab(1) }
             homeVisible = false
             homeScrollView.isHidden = true
+            statusBarCover.isHidden = true
             hideNewPlaceholder()
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
                 self?.navigate(to: route)
