@@ -202,6 +202,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBar.tintColor = activeColor
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithTransparentBackground()
+        if #available(iOS 26, *) {
+            tabAppearance.backgroundEffect = UIGlassEffect(style: .regular)
+        }
         tabBar.standardAppearance = tabAppearance
         tabBar.scrollEdgeAppearance = tabAppearance
         tabBar.unselectedItemTintColor = .secondaryLabel
@@ -246,9 +249,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         // Home 0, New 1, Radio 2, Library 3, Search 4.
         let items: [(String, String, String, String)] = [
             ("house", "house.fill", "Home", "home"),
-            ("square.grid.2x2", "square.grid.2x2.fill", "New", "new"),
+            ("square.grid.2x2.fill", "square.grid.2x2.fill", "New", "new"),
             ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
-            ("music.note.tv", "music.note.tv", "Library", "library"),
+            ("music.note.tv.fill", "music.note.tv.fill", "Library", "library"),
             ("magnifyingglass", "magnifyingglass", "Search", "search")
         ]
         var tabItems: [UITabBarItem] = []
@@ -275,7 +278,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         activePill.layer.masksToBounds = true
         activePill.layer.borderWidth = 0.5
         activePill.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
-        activePillTint.backgroundColor = activeColor.withAlphaComponent(0.26)
+        activePillTint.backgroundColor = activeColor.withAlphaComponent(0.62)
         activePillTint.translatesAutoresizingMaskIntoConstraints = false
         activePill.contentView.addSubview(activePillTint)
         NSLayoutConstraint.activate([
