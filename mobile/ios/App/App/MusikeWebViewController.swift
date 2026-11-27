@@ -434,7 +434,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
             miniArtwork.image = UIImage(systemName: "music.note", withConfiguration: config)?.withRenderingMode(.alwaysTemplate)
             miniArtwork.tintColor = .label
-            miniArtwork.backgroundColor = UIColor.secondarySystemFill
+            miniArtwork.backgroundColor = UIColor.systemGray4
             miniArtwork.contentMode = .center
         } else {
             miniArtwork.tintColor = nil
