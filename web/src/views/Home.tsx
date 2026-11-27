@@ -38,6 +38,15 @@ function CardBadge() {
   );
 }
 
+/**
+ * Whole-card widths for the Home rails. Each rail uses `gap-4` (1rem), so N
+ * cards fill the visible width exactly when each is (100% - (N-1) * 1rem) / N.
+ * Percentages (not vw or fixed px) mean an integer number of cards is visible at
+ * every breakpoint, so no partial card peeks in at the right edge.
+ */
+const railCardWidth =
+  "w-[calc((100%_-_1rem)/2)] sm:w-[calc((100%_-_2rem)/3)] md:w-[calc((100%_-_3rem)/4)] lg:w-[calc((100%_-_4rem)/5)] xl:w-[calc((100%_-_5rem)/6)]";
+
 function HomeHeader() {
   const t = useT();
   const info = useSystem((s) => s.info);
@@ -121,7 +130,7 @@ function PlaylistCard({ playlist }: { playlist: Playlist }) {
   const playList = usePlayer((s) => s.playList);
   return (
     <div
-      className="group relative w-[58vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-[18px] md:w-[248px]"
+      className={`group relative ${railCardWidth} shrink-0 snap-start overflow-hidden rounded-[18px]`}
       style={{ background: cardGradient(playlist.id) }}
     >
       <div className="pointer-events-none relative flex aspect-[4/5] flex-col justify-between p-4">
@@ -159,7 +168,7 @@ function StationCard({ genre }: { genre: Genre }) {
     <Link
       to={paths.genre(genre.id)}
       state={{ name: genre.name }}
-      className="group flex w-[34vw] max-w-[180px] shrink-0 snap-start flex-col gap-2 md:w-[164px]"
+      className={`group flex ${railCardWidth} shrink-0 snap-start flex-col gap-2`}
     >
       <span className="relative block aspect-square overflow-hidden rounded-[14px]" style={{ background: cardGradient(genre.id) }}>
         <span className="absolute inset-0 grid place-items-center">
@@ -180,7 +189,7 @@ function RecentCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
     <button
       type="button"
       onClick={onPlay}
-      className="group flex w-[44vw] max-w-[260px] shrink-0 snap-start flex-col gap-2 text-left md:w-[240px] lg:w-[280px]"
+      className={`group flex ${railCardWidth} shrink-0 snap-start flex-col gap-2 text-left`}
     >
       <span className="relative block">
         <Artwork src={track.art} fallback={track.thumb} className="aspect-square w-full rounded-[16px]" />
@@ -265,9 +274,10 @@ export default function Home() {
         : null;
 
   // Clip at the page edge so no card gradient or decorative shadow can escape
-  // past the right side of a rail.
+  // past the right side of a rail. Top padding clears the status bar on the
+  // edge-to-edge web view so the sticky "Home" title never ghosts behind it.
   return (
-    <div className="overflow-x-clip pb-8">
+    <div className="overflow-x-clip pt-[env(safe-area-inset-top)] pb-8">
       <HomeHeader />
 
       {status === "loading" && <TrackListSkeleton rows={6} />}
