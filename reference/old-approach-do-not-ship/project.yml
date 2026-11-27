@@ -1,0 +1,34 @@
+name: MusikeGlass
+options:
+  platform: iOS
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26"
+  createIntermediateGroups: true
+settings:
+  PRODUCT_BUNDLE_IDENTIFIER: app.musike.glass
+  MARKETING_VERSION: "1.0"
+  CURRENT_PROJECT_VERSION: "1"
+  TARGETED_DEVICE_FAMILY: "1,2"
+  CODE_SIGNING_ALLOWED: NO
+  CODE_SIGNING_REQUIRED: NO
+  SUPPORTS_MACCATALYST: NO
+targets:
+  MusikeGlass:
+    type: application
+    sources:
+      - path: Sources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Music
+        CFBundleName: MusikeGlass
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).SceneDelegate"
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
