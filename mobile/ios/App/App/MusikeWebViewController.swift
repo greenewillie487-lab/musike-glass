@@ -119,6 +119,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var previewScrollOffset: CGFloat = 0
     private var previewNewTab = false
     private var previewLight = false
+    private var newOverlay: UIView?
     private var isObservingScroll = false
 
     private var appearanceMode = "system"
@@ -354,19 +355,51 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     private func showNewPlaceholder() {
+        hideNewPlaceholder()
         homeVisible = false
         homeScrollView.isHidden = true
-        newPlaceholder.isHidden = false
-        webView?.isHidden = true
-        view.bringSubviewToFront(newPlaceholder)
+
+        let overlay = UIView()
+        overlay.backgroundColor = .systemBackground
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        let title = UILabel()
+        title.text = "New"
+        title.font = .systemFont(ofSize: 34, weight: .bold)
+        title.textColor = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
+        title.textAlignment = .center
+        let subtitle = UILabel()
+        subtitle.text = "Built in Phase 3"
+        subtitle.font = .systemFont(ofSize: 15, weight: .regular)
+        subtitle.textColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor.white.withAlphaComponent(0.75) : UIColor.black.withAlphaComponent(0.65) }
+        subtitle.textAlignment = .center
+        let stack = UIStackView(arrangedSubviews: [title, subtitle])
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: overlay.centerYAnchor)
+        ])
+        view.addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.topAnchor.constraint(equalTo: view.topAnchor),
+            overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        view.bringSubviewToFront(overlay)
         view.bringSubviewToFront(tabBar)
         view.bringSubviewToFront(miniGlass)
-        view.layoutIfNeeded()
+        newOverlay = overlay
         tabBar.isHidden = false
         miniGlass.isHidden = false
     }
 
     private func hideNewPlaceholder() {
+        newOverlay?.removeFromSuperview()
+        newOverlay = nil
         newPlaceholder.isHidden = true
         webView?.isHidden = false
     }
@@ -787,7 +820,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     func setGlassEnabled(_ enabled: Bool) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            let placeholderVisible = !self.newPlaceholder.isHidden
+            let placeholderVisible = self.newOverlay != nil || !self.newPlaceholder.isHidden
             self.miniGlass.isHidden = !enabled && !placeholderVisible
             self.tabBar.isHidden = !enabled && !placeholderVisible
             self.homeVisible = enabled ? false : (self.currentPath == "/")
