@@ -108,6 +108,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let nextButton = UIButton(type: .system)
     private let progressBar = UIView()
     private var progressWidthConstraint: NSLayoutConstraint?
+    private let activePill = UIVisualEffectView(frame: .zero)
+    private let activePillTint = UIView()
+    private let newPlaceholder = UIView()
+    private var tabBarBottomConstraint: NSLayoutConstraint?
+    private var chromeCollapsed = false
+    private var scrollAccumulation: CGFloat = 0
+    private var lastScrollOffset: CGFloat = 0
+    private var previewScrollOffset: CGFloat = 0
+    private var previewNewTab = false
+    private var previewLight = false
+    private var isObservingScroll = false
 
     private var appearanceMode = "system"
     private var isPlaying = false
@@ -126,7 +137,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var artworkURL = ""
     private var artworkTask: URLSessionDataTask?
 
-    private let routes = ["/", "__radio__", "/library", "/search"]
+    private let routes = ["/", "__new__", "__radio__", "/library", "/search"]
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -154,6 +165,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         applyAppearance()
         postRoute()
         setRoute("/")
+        readPreviewArguments()
+        webView?.scrollView.addObserver(self, forKeyPath: "contentOffset", options: [.initial, .new], context: nil)
+        homeScrollView.addObserver(self, forKeyPath: "contentOffset", options: [.initial, .new], context: nil)
+        isObservingScroll = true
+        applyPreviewState()
     }
 
     // MARK: - Native Liquid Glass
@@ -169,7 +185,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     private func installGlassChrome() {
         miniGlass.effect = liquidGlassEffect()
-        miniGlass.layer.cornerRadius = 18
+        miniGlass.layer.cornerRadius = 28
         miniGlass.layer.masksToBounds = true
         miniGlass.translatesAutoresizingMaskIntoConstraints = false
 
@@ -179,43 +195,56 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         tabBar.delegate = self
         tabBar.isTranslucent = true
         tabBar.backgroundColor = .clear
-        tabBar.layer.cornerRadius = 26
+        tabBar.layer.cornerRadius = 32
         tabBar.layer.masksToBounds = true
         tabBar.tintColor = activeColor
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithTransparentBackground()
         tabBar.standardAppearance = tabAppearance
         tabBar.scrollEdgeAppearance = tabAppearance
+        tabBar.unselectedItemTintColor = .secondaryLabel
 
+        installActivePill()
         buildTabBar()
+        buildNewPlaceholder()
         buildMiniPlayer()
 
         view.addSubview(homeScrollView)
         view.addSubview(tabBar)
         view.addSubview(miniGlass)
+        view.insertSubview(newPlaceholder, belowSubview: tabBar)
 
         let guide = view.safeAreaLayoutGuide
+        let bottom = tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8)
+        tabBarBottomConstraint = bottom
         NSLayoutConstraint.activate([
             homeScrollView.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
-            homeScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            homeScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            homeScrollView.bottomAnchor.constraint(equalTo: miniGlass.topAnchor, constant: -10),
+            homeScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            homeScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            homeScrollView.bottomAnchor.constraint(equalTo: miniGlass.topAnchor, constant: -8),
 
-            tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            tabBar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
-            tabBar.heightAnchor.constraint(equalToConstant: 72),
+            tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            bottom,
+            tabBar.heightAnchor.constraint(equalToConstant: 64),
 
-            miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            miniGlass.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -10),
-            miniGlass.heightAnchor.constraint(equalToConstant: 54)
+            miniGlass.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            miniGlass.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            miniGlass.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -8),
+            miniGlass.heightAnchor.constraint(equalToConstant: 56),
+
+            newPlaceholder.topAnchor.constraint(equalTo: view.topAnchor),
+            newPlaceholder.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            newPlaceholder.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            newPlaceholder.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
     private func buildTabBar() {
+        // Home 0, New 1, Radio 2, Library 3, Search 4.
         let items: [(String, String, String, String)] = [
             ("house", "house.fill", "Home", "home"),
+            ("square.grid.2x2", "square.grid.2x2.fill", "New", "new"),
             ("dot.radiowaves.left.and.right", "dot.radiowaves.left.and.right", "Radio", "radio"),
             ("music.note.tv", "music.note.tv", "Library", "library"),
             ("magnifyingglass", "magnifyingglass", "Search", "search")
@@ -235,9 +264,102 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         setActiveTab(0)
     }
 
+    /// The selected tab is a translucent red glass pill behind the real tab
+    /// button (never a flat rect and never a replacement for UITabBar).
+    private func installActivePill() {
+        activePill.translatesAutoresizingMaskIntoConstraints = false
+        activePill.isUserInteractionEnabled = false
+        activePill.effect = liquidGlassEffect()
+        activePill.layer.masksToBounds = true
+        activePill.layer.borderWidth = 0.5
+        activePill.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
+        activePillTint.backgroundColor = activeColor.withAlphaComponent(0.26)
+        activePillTint.translatesAutoresizingMaskIntoConstraints = false
+        activePill.contentView.addSubview(activePillTint)
+        NSLayoutConstraint.activate([
+            activePillTint.topAnchor.constraint(equalTo: activePill.contentView.topAnchor),
+            activePillTint.leadingAnchor.constraint(equalTo: activePill.contentView.leadingAnchor),
+            activePillTint.trailingAnchor.constraint(equalTo: activePill.contentView.trailingAnchor),
+            activePillTint.bottomAnchor.constraint(equalTo: activePill.contentView.bottomAnchor)
+        ])
+        tabBar.addSubview(activePill)
+        if let background = tabBar.subviews.first(where: {
+            NSStringFromClass($0.classForCoder).contains("Background")
+        }), let index = tabBar.subviews.firstIndex(of: background) {
+            tabBar.insertSubview(activePill, at: index + 1)
+        } else {
+            tabBar.insertSubview(activePill, at: 0)
+        }
+    }
+
+    private func buildNewPlaceholder() {
+        let title = UILabel()
+        title.text = "New"
+        title.font = .systemFont(ofSize: 34, weight: .bold)
+        title.textColor = .label
+        title.textAlignment = .center
+        let subtitle = UILabel()
+        subtitle.text = "Built in Phase 3"
+        subtitle.font = .systemFont(ofSize: 15, weight: .regular)
+        subtitle.textColor = .secondaryLabel
+        subtitle.textAlignment = .center
+        let stack = UIStackView(arrangedSubviews: [title, subtitle])
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        newPlaceholder.addSubview(stack)
+        newPlaceholder.accessibilityIdentifier = "native-new-placeholder"
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: newPlaceholder.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: newPlaceholder.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: newPlaceholder.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: newPlaceholder.trailingAnchor, constant: -24)
+        ])
+    }
+
     private func setActiveTab(_ index: Int) {
         guard let items = tabBar.items, items.indices.contains(index) else { return }
         tabBar.selectedItem = items[index]
+        layoutActivePill()
+    }
+
+    private func layoutActivePill() {
+        guard let items = tabBar.items, let selected = tabBar.selectedItem,
+              let index = items.firstIndex(where: { $0 === selected }) else {
+            activePill.isHidden = true
+            return
+        }
+        let bounds = tabBar.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        activePill.isHidden = false
+        let buttons = tabBar.subviews.filter { NSStringFromClass($0.classForCoder).contains("UITabBarButton") }
+        let slot: CGRect
+        if buttons.count == items.count, buttons.indices.contains(index), buttons[index].width > 0 {
+            slot = buttons[index].frame
+        } else {
+            let slotWidth = bounds.width / CGFloat(items.count)
+            slot = CGRect(x: CGFloat(index) * slotWidth, y: 0, width: slotWidth, height: bounds.height)
+        }
+        let maxWidth = max(40, bounds.width / CGFloat(items.count) - 8)
+        let width = min(max(40, slot.width * 0.86), maxWidth)
+        let height = bounds.height - 14
+        activePill.frame = CGRect(x: slot.midX - width / 2, y: (bounds.height - height) / 2,
+                                  width: width, height: height)
+        activePill.layer.cornerRadius = height / 2
+        activePillTint.layer.cornerRadius = height / 2
+    }
+
+    private func showNewPlaceholder() {
+        homeVisible = false
+        homeScrollView.isHidden = true
+        newPlaceholder.isHidden = false
+        tabBar.isHidden = false
+        miniGlass.isHidden = false
+    }
+
+    private func hideNewPlaceholder() {
+        newPlaceholder.isHidden = true
     }
 
     private func buildMiniPlayer() {
@@ -250,13 +372,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             progressBar.heightAnchor.constraint(equalToConstant: 2)
         ])
 
-        miniArtwork.image = UIImage(systemName: "music.note")
-        miniArtwork.tintColor = .secondaryLabel
-        miniArtwork.backgroundColor = UIColor.secondarySystemFill
-        miniArtwork.contentMode = .scaleAspectFill
         miniArtwork.clipsToBounds = true
-        miniArtwork.layer.cornerRadius = 6
         miniArtwork.translatesAutoresizingMaskIntoConstraints = false
+        setIdleArtwork(true)
 
         miniTitle.text = "Not Playing"
         miniTitle.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -270,7 +388,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         labels.translatesAutoresizingMaskIntoConstraints = false
 
         playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
-        nextButton.setImage(UIImage(systemName: "forward.end.fill"), for: .normal)
+        nextButton.setImage(UIImage(systemName: "forward.fill"), for: .normal)
         playButton.tintColor = .label
         nextButton.tintColor = .label
         playButton.translatesAutoresizingMaskIntoConstraints = false
@@ -290,6 +408,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         miniTap.delegate = self
         miniTap.cancelsTouchesInView = false
         miniGlass.addGestureRecognizer(miniTap)
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(miniPanned(_:)))
+        pan.delegate = self
+        miniGlass.addGestureRecognizer(pan)
         let widthConstraint = progressBar.widthAnchor.constraint(equalToConstant: 0)
         widthConstraint.isActive = true
         progressWidthConstraint = widthConstraint
@@ -304,6 +425,21 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             playButton.widthAnchor.constraint(equalToConstant: 44),
             nextButton.widthAnchor.constraint(equalToConstant: 44)
         ])
+    }
+
+    private func setIdleArtwork(_ idle: Bool) {
+        miniArtwork.layer.cornerRadius = 10
+        if idle {
+            let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+            miniArtwork.image = UIImage(systemName: "music.note", withConfiguration: config)
+            miniArtwork.tintColor = .secondaryLabel
+            miniArtwork.backgroundColor = UIColor.secondarySystemFill
+            miniArtwork.contentMode = .center
+        } else {
+            miniArtwork.tintColor = nil
+            miniArtwork.backgroundColor = .clear
+            miniArtwork.contentMode = .scaleAspectFill
+        }
     }
 
     // MARK: - Native Home shelves (Apple public RSS feed)
@@ -373,13 +509,14 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         title.text = "Home"
         title.font = .systemFont(ofSize: 34, weight: .bold)
         homeStack.addArrangedSubview(title)
-        guard !chartItems.isEmpty else { return }
+        guard !chartItems.isEmpty else { applyPreviewScroll(); return }
         let newer = chartItems.sorted {
             String($0["releaseDate"] as? String ?? "") > String($1["releaseDate"] as? String ?? "")
         }
         addHomeSection("Made for You", items: Array(chartItems.prefix(20)))
         addHomeSection("New Releases", items: Array(newer.prefix(20)))
         addHomeSection("Top Charts", items: Array(chartItems.prefix(30)))
+        applyPreviewScroll()
     }
 
     private func addHomeSection(_ title: String, items: [[String: Any]]) {
@@ -526,10 +663,14 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         let index = item.tag
         guard routes.indices.contains(index) else { return }
-        radioSelected = (index == 1)
-        if routes[index] == "__radio__" {
+        radioSelected = (index == 2)
+        if index == 1 {
+            showNewPlaceholder()
+        } else if routes[index] == "__radio__" {
+            hideNewPlaceholder()
             startRadio()
         } else {
+            hideNewPlaceholder()
             navigate(to: routes[index])
         }
     }
@@ -561,18 +702,20 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     func setRoute(_ url: String) {
         if radioSelected && (url == "/" || url.isEmpty) { return }
+        if !newPlaceholder.isHidden { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
         currentPath = path
         let sheetOpen = url.contains("#now-playing")
         homeVisible = path == "/" && !sheetOpen
         homeScrollView.isHidden = !homeVisible
+        if homeVisible { hideNewPlaceholder() }
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
         if sheetOpen { return }
-        if path.hasPrefix("/search") { setActiveTab(3) }
+        if path.hasPrefix("/search") { setActiveTab(4) }
         else if path.hasPrefix("/library") || path.hasPrefix("/favorites") ||
-                path.hasPrefix("/history") || path.hasPrefix("/playlist") { setActiveTab(2) }
+                path.hasPrefix("/history") || path.hasPrefix("/playlist") { setActiveTab(3) }
         else { setActiveTab(0) }
     }
 
@@ -624,9 +767,12 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             self.tabBar.isHidden = !enabled
             self.homeVisible = enabled ? false : (self.currentPath == "/")
             self.homeScrollView.isHidden = !self.homeVisible
+            if enabled { self.hideNewPlaceholder() }
             if !enabled {
                 self.miniTitle.text = "Not Playing"
                 self.miniArtist.text = ""
+                self.artworkURL = ""
+                self.setIdleArtwork(true)
                 self.setProgress(0)
             }
         }
@@ -639,6 +785,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             self.miniTitle.text = name
             self.miniArtist.text = (artist?.isEmpty == false ? artist : nil)
             self.setProgress(0)
+            self.setIdleArtwork(true)
             self.loadArtwork(link)
         }
     }
@@ -672,9 +819,101 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         artworkTask?.cancel()
         artworkTask = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
             guard let self, let data, let image = UIImage(data: data), link == self.artworkURL else { return }
-            DispatchQueue.main.async { self.miniArtwork.image = image }
+            DispatchQueue.main.async {
+                self.miniArtwork.image = image
+                self.setIdleArtwork(false)
+            }
         }
         artworkTask?.resume()
+    }
+
+    @objc private func miniPanned(_ gesture: UIPanGestureRecognizer) {
+        guard gesture.state == .ended || gesture.state == .cancelled else { return }
+        let translation = gesture.translation(in: miniGlass)
+        let velocity = gesture.velocity(in: miniGlass)
+        if translation.y < -36 || velocity.y < -420 { openNowPlaying() }
+        gesture.setTranslation(.zero, in: miniGlass)
+    }
+
+    // MARK: - Native scroll collapse (KVO on WKWebView.scrollView, no JS)
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                               change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        guard keyPath == "contentOffset", let scroll = object as? UIScrollView else {
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+            return
+        }
+        let activeScroll = homeVisible ? homeScrollView : webView?.scrollView
+        guard scroll === activeScroll else { return }
+        let offset = scroll.contentOffset.y
+        let delta = offset - lastScrollOffset
+        lastScrollOffset = offset
+        if offset <= 8 {
+            scrollAccumulation = 0
+            setChromeCollapsed(false)
+            return
+        }
+        scrollAccumulation = max(0, min(scrollAccumulation + delta, 160))
+        if !chromeCollapsed && scrollAccumulation >= 60 {
+            setChromeCollapsed(true)
+        } else if chromeCollapsed && scrollAccumulation <= 12 {
+            setChromeCollapsed(false)
+        }
+    }
+
+    private func setChromeCollapsed(_ collapsed: Bool) {
+        guard collapsed != chromeCollapsed else { return }
+        chromeCollapsed = collapsed
+        // One stored constraint owns the whole chrome offset; mini follows the tab bar.
+        tabBarBottomConstraint?.constant = collapsed ? 72 : -8
+        miniGlass.alpha = collapsed ? 0 : 1
+        miniGlass.isUserInteractionEnabled = !collapsed
+        UIView.animate(withDuration: 0.22, delay: 0, options: [.beginFromCurrentState], animations: {
+            self.view.layoutIfNeeded()
+        })
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        layoutActivePill()
+    }
+
+    deinit {
+        guard isObservingScroll else { return }
+        webView?.scrollView.removeObserver(self, forKeyPath: "contentOffset")
+        homeScrollView.removeObserver(self, forKeyPath: "contentOffset")
+    }
+
+    // MARK: - Preview-only launch arguments (inert in normal launches)
+    private func readPreviewArguments() {
+        for argument in CommandLine.arguments {
+            if argument.hasPrefix("-previewScroll=") {
+                let value = String(argument.dropFirst("-previewScroll=".count))
+                previewScrollOffset = CGFloat(Double(value) ?? 0)
+            } else if argument == "-previewTab=new" {
+                previewNewTab = true
+            } else if argument == "-previewAppearance=light" {
+                previewLight = true
+            }
+        }
+    }
+
+    private func applyPreviewState() {
+        if previewLight {
+            overrideUserInterfaceStyle = .light
+            setAppearance("light")
+        }
+        if previewNewTab {
+            setActiveTab(1)
+            showNewPlaceholder()
+        }
+        applyPreviewScroll()
+    }
+
+    private func applyPreviewScroll() {
+        guard previewScrollOffset > 0, homeVisible, !previewNewTab else { return }
+        // Seed the hysteresis baseline so the preview jump alone cannot collapse chrome.
+        lastScrollOffset = previewScrollOffset
+        homeScrollView.setContentOffset(CGPoint(x: 0, y: previewScrollOffset), animated: false)
     }
 
     // MARK: - Appearance
