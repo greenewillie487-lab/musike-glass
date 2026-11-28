@@ -1,15 +1,14 @@
 import { cn } from "../lib/format";
 
-/** The Musike mark: three equalizer bars forming an M. */
+/** The in-app mark: supplied red dancer cutout, no background or border. */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-      <g fill="currentColor">
-        <rect x="10" y="10" width="8" height="28" rx="4" />
-        <rect x="20" y="10" width="8" height="16" rx="4" />
-        <rect x="30" y="10" width="8" height="28" rx="4" />
-      </g>
-    </svg>
+    <img
+      src="/logo.png"
+      alt=""
+      aria-hidden="true"
+      className={cn("object-contain", className)}
+    />
   );
 }
 
