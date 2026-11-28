@@ -32,14 +32,14 @@ import java.net.URL;
 /**
  * Keeps Musike alive while music plays and connects it to the system: the media notification, the lock screen,
  * headphone and Bluetooth buttons, and pausing when headphones are unplugged. The music itself plays in the
- * WebView; this service only mirrors what the app reports (see MusikePlaybackPlugin) and relays the buttons back.
+ * WebView; this service only mirrors what the app reports (see ZidonPlaybackPlugin) and relays the buttons back.
  * Everything here runs on the main thread.
  */
 // A media-session notification doesn't need the notification permission (Android 13+ exempts it).
 @SuppressLint("NotificationPermission")
 public class PlaybackService extends Service {
 
-    private static final String TAG = "MusikePlayback";
+    private static final String TAG = "ZidonPlayback";
     private static final String CHANNEL = "playback";
     private static final int NOTIFICATION_ID = 1;
     private static final String ACTION = "app.musike.android.action.";

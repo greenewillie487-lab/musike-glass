@@ -13,8 +13,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * The app's side of PlaybackService (web/src/native/media.ts): the player reports the track and its progress
  * through update(), and the buttons pressed outside the app come back as "action" events.
  */
-@CapacitorPlugin(name = "MusikePlayback")
-public class MusikePlaybackPlugin extends Plugin {
+@CapacitorPlugin(name = "ZidonPlayback")
+public class ZidonPlaybackPlugin extends Plugin {
 
     private final Handler main = new Handler(Looper.getMainLooper());
 

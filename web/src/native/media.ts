@@ -2,7 +2,7 @@ import { registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import type { SystemMedia } from "../lib/apiTypes";
 
 /**
- * Bridge to the app's Android side (MusikePlaybackPlugin.java): a foreground service with a media session,
+ * Bridge to the app's Android side (ZidonPlaybackPlugin.java): a foreground service with a media session,
  * so music keeps playing with the screen off and the notification, lock screen and headphone buttons work.
  */
 interface PlaybackPlugin {
@@ -19,7 +19,7 @@ interface PlaybackPlugin {
 }
 
 const noop = async () => {};
-const Playback = registerPlugin<PlaybackPlugin>("MusikePlayback", {
+const Playback = registerPlugin<PlaybackPlugin>("ZidonPlayback", {
   // In a desktop browser (development), there is nothing to drive.
   web: () => ({ update: noop, addListener: async () => ({ remove: noop }) }),
 });

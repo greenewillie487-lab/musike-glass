@@ -2,8 +2,8 @@ import { App } from "@capacitor/app";
 import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { installTvMode } from "../tv/tvMode";
 
-/** MusikeDevicePlugin.java: what kind of device this is. */
-const Device = registerPlugin<{ info(): Promise<{ tv: boolean }> }>("MusikeDevice", {
+/** ZidonDevicePlugin.java: what kind of device this is. */
+const Device = registerPlugin<{ info(): Promise<{ tv: boolean }> }>("ZidonDevice", {
   web: () => ({ info: async () => ({ tv: false }) }),
 });
 

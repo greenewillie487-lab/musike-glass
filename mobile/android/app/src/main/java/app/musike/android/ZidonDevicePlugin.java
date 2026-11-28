@@ -11,8 +11,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /** What kind of device the app runs on (web/src/native/android.ts): the same APK serves phones and Android TV. */
-@CapacitorPlugin(name = "MusikeDevice")
-public class MusikeDevicePlugin extends Plugin {
+@CapacitorPlugin(name = "ZidonDevice")
+public class ZidonDevicePlugin extends Plugin {
 
     @PluginMethod
     public void info(PluginCall call) {
