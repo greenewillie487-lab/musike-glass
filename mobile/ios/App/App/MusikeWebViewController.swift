@@ -43,6 +43,11 @@ private final class RouteHandler: NSObject, WKScriptMessageHandler {
             DispatchQueue.main.async { [weak controller] in
                 guard let controller else { return }
                 controller.applyScrollMaster(offsetY: CGFloat(y))
+                // DIAGNOSTIC (preview-only): echo the native application back
+                // into the page badge — one screenshot shows both sides.
+                controller.webView?.evaluateJavaScript(
+                    "(function(){var p=document.getElementById('scroll-probe');if(p)p.textContent+=' N';})();",
+                    completionHandler: nil)
             }
             return
         }
@@ -548,6 +553,17 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             if (t && t.nodeType === 1 && t.matches && t.matches('main.scroll-area')) {
               var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeRoute;
               var n = Math.round(t.scrollTop);
+              try {
+                var p = document.getElementById('scroll-probe');
+                if (!p) {
+                  p = document.createElement('div');
+                  p.id = 'scroll-probe';
+                  p.style.cssText = 'position:fixed;top:44px;left:8px;z-index:99999;background:#fa243d;color:#fff;font:11px monospace;padding:2px 6px;border-radius:6px;white-space:pre;';
+                  (document.body || document.documentElement).appendChild(p);
+                }
+                p.textContent = 'SP:' + n + ' WY:' + Math.round(window.scrollY) +
+                  ' SH:' + t.scrollHeight + ' CH:' + t.clientHeight;
+              } catch (err) {}
               if (h) h.postMessage('scroll:' + n);
             }
           }, { passive: true, capture: true });
