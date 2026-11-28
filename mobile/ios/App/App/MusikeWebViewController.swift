@@ -557,6 +557,37 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         webView?.evaluateJavaScript(js)
     }
 
+    /// Preview navigation that survives a slow first page commit: a fixed +4s
+    /// one-shot silently dies when the document is still provisional, which is
+    /// why a working capture can break on the next identical run. Poll until
+    /// the web app confirms it is on the route (the SPA keeps its document, so
+    /// one successful pushState + popstate is enough; React Router picks up a
+    /// pre-mount URL change when it initializes).
+    private func navigateVerified(to route: String, attempts: Int = 24) {
+        guard attempts > 0 else { return }
+        let path = route.components(separatedBy: "?").first ?? route
+        let js = """
+        (function(){
+          if (document.getElementById('root')) {
+            history.pushState({}, '', \(jsString(route)));
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            return location.pathname;
+          }
+          return '';
+        })();
+        """
+        webView?.evaluateJavaScript(js) { [weak self] result, _ in
+            let landed = (result as? String)?.hasPrefix(path) ?? false
+            DispatchQueue.main.async {
+                if !landed {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) { [weak self] in
+                        self?.navigateVerified(to: route, attempts: attempts - 1)
+                    }
+                }
+            }
+        }
+    }
+
     func setRoute(_ url: String) {
         if (previewNewTab || previewRoute != nil) && (url == "/" || url.isEmpty) { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
@@ -783,9 +814,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
                     route.hasPrefix("/history") || route.hasPrefix("/playlist") { setActiveTab(2) }
             else { setActiveTab(1) }
             // The web app owns the destination. No native placeholder: just
-            // navigate once its initial route post has settled.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-                self?.navigate(to: route)
+            // navigate once its initial route post has settled — with a
+            // verified retry, since the fixed-timer one-shot is racy.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                self?.navigateVerified(to: route)
             }
             if previewArtistTap {
                 // Results render after the route change, and the album/genre
@@ -825,8 +857,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         // running across SPA route changes until results render. The loop is
         // injected at +5s — evaluateJavaScript called before the first page
         // commits runs in the provisional document whose timers die on load.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-            self?.navigate(to: "/search?q=Kweku%20Smoke")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.navigateVerified(to: "/search?q=Kweku%20Smoke")
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             guard let self else { return }
