@@ -41,13 +41,7 @@ private final class RouteHandler: NSObject, WKScriptMessageHandler {
         if path.hasPrefix("scroll:") {
             let y = Double(path.dropFirst("scroll:".count)) ?? 0
             DispatchQueue.main.async { [weak controller] in
-                guard let controller else { return }
-                controller.applyScrollMaster(offsetY: CGFloat(y))
-                // DIAGNOSTIC (preview-only): echo the native application back
-                // into the page badge — one screenshot shows both sides.
-                controller.webView?.evaluateJavaScript(
-                    "(function(){var p=document.getElementById('scroll-probe');if(p)p.textContent+=' N';})();",
-                    completionHandler: nil)
+                controller?.applyScrollMaster(offsetY: CGFloat(y))
             }
             return
         }
@@ -156,8 +150,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private let compactTitleBackground = UIView()
     private var compactTitleTopConstraint: NSLayoutConstraint?
     /// Single source of truth for native title/chrome state. Derived from the
-    /// active scroll view's contentOffset; no boolean collapse flag and no
-    /// accumulated delta, so the title tracks position continuously.
+    /// page scroller's offset (reported through the bridge); no boolean
+    /// collapse flag and no accumulated delta, so the title tracks position
+    /// continuously.
     private var scrollProgress: CGFloat = 0
     private var previewScrollOffset: CGFloat = 0
     private var previewNewTab = false
@@ -167,7 +162,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     private var previewArtistTap = false
     private var previewLight = false
     private var previewSeedHistory = false
-    private var isObservingScroll = false
 
     private var appearanceMode = "system"
     private var isPlaying = false
@@ -210,10 +204,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         postRoute()
         setRoute("/")
         readPreviewArguments()
-        // Web Home is the only Home: the WKWebView scroll view is the sole
-        // scroll master, so no second scroll view is observed.
-        webView?.scrollView.addObserver(self, forKeyPath: "contentOffset", options: [.initial, .new], context: nil)
-        isObservingScroll = true
+        // The page scrolls its own <main> scroller and reports the offset
+        // through the 'scroll:' bridge message — that is the ONLY scroll
+        // source. The WKWebView scroll view never legitimately moves here
+        // (html/body are height:100%), and its KVO fired spurious zero-offset
+        // adjustments on WebKit layout that reset the collapse.
         applyPreviewState()
     }
 
@@ -552,19 +547,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             var t = e.target;
             if (t && t.nodeType === 1 && t.matches && t.matches('main.scroll-area')) {
               var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeRoute;
-              var n = Math.round(t.scrollTop);
-              try {
-                var p = document.getElementById('scroll-probe');
-                if (!p) {
-                  p = document.createElement('div');
-                  p.id = 'scroll-probe';
-                  p.style.cssText = 'position:fixed;top:44px;left:8px;z-index:99999;background:#fa243d;color:#fff;font:11px monospace;padding:2px 6px;border-radius:6px;white-space:pre;';
-                  (document.body || document.documentElement).appendChild(p);
-                }
-                p.textContent = 'SP:' + n + ' WY:' + Math.round(window.scrollY) +
-                  ' SH:' + t.scrollHeight + ' CH:' + t.clientHeight;
-              } catch (err) {}
-              if (h) h.postMessage('scroll:' + n);
+              if (h) h.postMessage('scroll:' + Math.round(t.scrollTop));
             }
           }, { passive: true, capture: true });
           document.addEventListener('DOMContentLoaded', postRoute);
@@ -777,19 +760,10 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
 
     // MARK: - Native scroll master (single source of truth)
 
-    /// KVO reports which scroll moved; it never decides chrome state itself.
-    override func observeValue(forKeyPath keyPath: String?, of object: Any?,
-                               change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        guard keyPath == "contentOffset", let scroll = object as? UIScrollView else {
-            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
-            return
-        }
-        // WK-level scrolls (rubber band, programmatic) feed the same master as
-        // the page's internal scroller does through the "scroll:" bridge
-        // message; neither writes chrome state directly.
-        guard scroll === webView?.scrollView else { return }
-        applyScrollMaster(offsetY: scroll.contentOffset.y)
-    }
+    /// The KVO observer is gone on purpose: the WK scroll view never scrolls
+    /// (the page manages scrolling in <main>), and WebKit's layout-time offset
+    /// micro-adjustments fired spurious zero-offset resets that killed the
+    /// collapse. The page's 'scroll:' bridge message is the sole source.
 
     /// The one scroll master: a pure, continuous mapping from contentOffset to
     /// every title/bar value. No accumulation, no thresholds, no boolean cliff
@@ -828,8 +802,8 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     }
 
     deinit {
-        guard isObservingScroll else { return }
-        webView?.scrollView.removeObserver(self, forKeyPath: "contentOffset")
+        // No KVO observation to detach: the page scroller reports through the
+        // bridge (see capacitorDidLoad).
     }
 
     // MARK: - Preview-only launch arguments (inert in normal launches)
