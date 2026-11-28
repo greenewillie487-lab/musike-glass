@@ -17,18 +17,18 @@ export interface ChartItem {
 export interface Charts {
   topSongs: ChartItem[];
   ghanaSongs: ChartItem[];
-  newMusic: ChartItem[];
+  nigeriaSongs: ChartItem[];
   topAlbums: ChartItem[];
 }
 
-const CACHE_KEY = "musike:charts:v1";
+const CACHE_KEY = "musike:charts:v2";
 const TTL = 3 * 60 * 60 * 1000;
-const TIMEOUT = 8000;
+const TIMEOUT = 10000;
 
 const FEEDS: Record<keyof Charts, string> = {
   topSongs: "https://rss.marketingtools.apple.com/api/v2/us/music/most-played/50/songs.json",
   ghanaSongs: "https://rss.marketingtools.apple.com/api/v2/gh/music/most-played/50/songs.json",
-  newMusic: "https://rss.marketingtools.apple.com/api/v2/us/music/new-music-daily/50/songs.json",
+  nigeriaSongs: "https://rss.marketingtools.apple.com/api/v2/ng/music/most-played/50/songs.json",
   topAlbums: "https://rss.marketingtools.apple.com/api/v2/us/music/most-played/50/albums.json",
 };
 
@@ -95,16 +95,18 @@ export async function loadCharts(): Promise<Charts | null> {
   } catch {
     /* an unreadable cache is just refetched */
   }
-  const [topSongs, ghanaSongs, newMusic, topAlbums] = await Promise.all([
-    fetchFeed(FEEDS.topSongs),
-    fetchFeed(FEEDS.ghanaSongs).then((r) => r ?? ghanaFallback()),
-    fetchFeed(FEEDS.newMusic),
-    fetchFeed(FEEDS.topAlbums),
+  const once = (key: keyof Charts): Promise<ChartItem[] | null> =>
+    fetchFeed(FEEDS[key]).then((r) => r ?? fetchFeed(FEEDS[key]));
+  const [topSongs, ghanaSongs, nigeriaSongs, topAlbums] = await Promise.all([
+    once("topSongs"),
+    once("ghanaSongs").then((r) => r ?? ghanaFallback()),
+    once("nigeriaSongs"),
+    once("topAlbums"),
   ]);
   const charts: Charts = {
     topSongs: topSongs ?? [],
     ghanaSongs: ghanaSongs ?? [],
-    newMusic: newMusic ?? [],
+    nigeriaSongs: nigeriaSongs ?? [],
     topAlbums: topAlbums ?? [],
   };
   const any = Object.values(charts).some((list) => list.length > 0);

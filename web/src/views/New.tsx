@@ -8,7 +8,7 @@ import { Section } from "../components/Page";
 import { useRemote } from "../hooks/useRemote";
 import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
-import { loadCharts, playChartSong, chartTrack, type Charts } from "../lib/charts";
+import { loadCharts, chartTrack, type Charts } from "../lib/charts";
 import { paths } from "../lib/routes";
 import type { Genre, GenrePage, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
@@ -92,12 +92,6 @@ export default function New() {
   const genres = useRemote<Genre[]>(`new-genres:${lang}`, () => api.genres());
   const charts = useRemote<Charts | null>("home-charts", () => loadCharts());
 
-  const playChart = (item: Parameters<typeof playChartSong>[0]) => {
-    void playChartSong(item).then((played) => {
-      if (!played) navigate(`${paths.search}?q=${encodeURIComponent(`${item.name} ${item.artistName}`.trim())}`);
-    });
-  };
-
   // A partial or failed library response must never crash the page.
   const favorites = lib.favorites ?? [];
   const playlists = lib.playlists ?? [];
@@ -179,11 +173,17 @@ export default function New() {
         <main className="new-feed">
           {hero && <NewFeatureCard feature={{ ...hero, hero: true }} />}
 
-          {charts.status === "ok" && charts.data?.newMusic.length ? (
-            <Section title={t.home.newMusic}>
+          {charts.status === "ok" && charts.data?.topAlbums.length ? (
+            <Section title={t.home.topAlbums}>
               <div className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
-                {charts.data.newMusic.slice(0, 16).map((item, i) => (
-                  <RecentCard key={`new-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
+                {charts.data.topAlbums.slice(0, 16).map((item, i) => (
+                  <RecentCard
+                    key={`alb-${item.name}-${i}`}
+                    track={chartTrack(item, i)}
+                    onPlay={() =>
+                      navigate(`${paths.search}?q=${encodeURIComponent(`${item.name} ${item.artistName}`.trim())}&type=albums`)
+                    }
+                  />
                 ))}
               </div>
             </Section>

@@ -330,11 +330,11 @@ export default function Home() {
             </Section>
           ) : null}
 
-          {charts.status === "ok" && charts.data?.newMusic.length ? (
-            <Section title={t.home.newMusic}>
+          {charts.status === "ok" && charts.data?.nigeriaSongs.length ? (
+            <Section title={t.home.topSongsNg}>
               <Rail>
-                {charts.data.newMusic.slice(0, 16).map((item, i) => (
-                  <RecentCard key={`new-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
+                {charts.data.nigeriaSongs.slice(0, 16).map((item, i) => (
+                  <RecentCard key={`ng-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
                 ))}
               </Rail>
             </Section>

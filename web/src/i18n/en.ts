@@ -69,7 +69,7 @@ export const en = {
     stationsForYou: "Stations for You",
     topSongs: "Top Songs",
     topSongsGh: "Top Songs in Ghana",
-    newMusic: "New Music",
+    topSongsNg: "Top Songs in Nigeria",
     topAlbums: "Top Albums",
     station: "Station",
     featured: "Featured",

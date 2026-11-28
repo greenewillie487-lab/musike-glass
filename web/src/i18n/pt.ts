@@ -64,7 +64,7 @@ export const pt: Messages = {
     stationsForYou: "Estações para você",
     topSongs: "As mais tocadas",
     topSongsGh: "As mais tocadas em Gana",
-    newMusic: "Músicas novas",
+    topSongsNg: "As mais tocadas na Nigéria",
     topAlbums: "Álbuns em alta",
     station: "Estação",
     featured: "Destaque",
