@@ -11,6 +11,8 @@ import WebKit
 /// both platforms is the one already written for Android.
 final class MusikePlayback: NSObject, WKScriptMessageHandler {
     private weak var webView: WKWebView?
+    /// The view controller owns the on-screen miniplayer; the web's track/state messages drive it through here.
+    weak var host: MusikeWebViewController?
     private var nowPlaying: [String: Any] = [:]
     private var artworks: [String: MPMediaItemArtwork] = [:]
     private var artworkURL = ""
@@ -91,6 +93,8 @@ final class MusikePlayback: NSObject, WKScriptMessageHandler {
         if number(body["duration"]) > 0 { nowPlaying[MPMediaItemPropertyPlaybackDuration] = number(body["duration"]) }
         publish()
         if let link = body["artwork"] as? String { loadArtwork(link) }
+        host?.setTrack(title: body["title"] as? String, artist: body["artist"] as? String,
+                       artwork: body["artwork"] as? String, duration: number(body["duration"]))
     }
 
     private func setState(_ body: [String: Any]) {
@@ -100,6 +104,8 @@ final class MusikePlayback: NSObject, WKScriptMessageHandler {
         if number(body["duration"]) > 0 { nowPlaying[MPMediaItemPropertyPlaybackDuration] = number(body["duration"]) }
         if playing { try? AVAudioSession.sharedInstance().setActive(true) }
         publish(state: playing ? .playing : .paused)
+        let duration = number(body["duration"])
+        host?.setPlaying(playing: playing, progress: duration > 0 ? number(body["position"]) / duration : 0)
     }
 
     private func publish(state: MPNowPlayingPlaybackState? = nil) {

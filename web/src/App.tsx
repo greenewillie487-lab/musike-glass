@@ -27,11 +27,15 @@ import BatchSearch from "./views/BatchSearch";
 import Collection from "./views/Collection";
 import Genre from "./views/Genre";
 import Home from "./views/Home";
+import { Capacitor } from "@capacitor/core";
 import Library from "./views/Library";
 import New from "./views/New";
 import Search from "./views/Search";
 
 const SHEET_HASH = `#${NOW_PLAYING_HASH}`;
+
+/** On the iPhone/iPad shell the native glass bars are the only chrome; the web draws none (Android keeps its own). */
+const iosNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
 export default function App() {
   const location = useLocation();
@@ -141,14 +145,15 @@ export default function App() {
         {panelOpen && hasTrack && <SidePanel />}
       </div>
 
-      {isMd ? (
-        <PlayerBar />
-      ) : (
-        <>
-          <MiniPlayer />
-          <TabBar />
-        </>
-      )}
+      {!iosNative &&
+        (isMd ? (
+          <PlayerBar />
+        ) : (
+          <>
+            <MiniPlayer />
+            <TabBar />
+          </>
+        ))}
 
       <PanelDrawer />
       <NowPlayingSheet open={sheetOpen} onClose={closeSheet} />

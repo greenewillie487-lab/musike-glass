@@ -339,6 +339,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (Math.abs(media.currentTime - get().position) >= 0.2) set({ position: media.currentTime });
       syncSystemMedia(); // throttled on the other side
     });
+    media.addEventListener("volumechange", () => {
+      if (!isActive()) return;
+      set({ volume: media.volume, muted: media.volume === 0 });
+    });
     media.addEventListener("progress", () => {
       if (!isActive() || !media.buffered.length) return;
       set({ buffered: media.buffered.end(media.buffered.length - 1) });

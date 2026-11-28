@@ -193,6 +193,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         appearanceHandler.controller = self
         routeHandler.controller = self
         liveFeedHandler.controller = self
+        playback.host = self
         playback.attach(webView)
         youtube.attach(webView)
         audio.attach(webView)

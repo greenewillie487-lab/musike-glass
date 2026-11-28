@@ -178,7 +178,7 @@ export function Lyrics({ track }: { track: Track }) {
             </div>
           </div>
           <div className="lyrics-follow">
-            {synced && !following ? <button className="lyrics-pill" onClick={resume}>{t.resume}</button> : <span>{synced ? t.seekHint : t.credit}</span>}
+            {synced && !following ? <button className="lyrics-pill" onClick={resume}>{t.resume}</button> : null}
           </div>
         </>
       )}

@@ -18,6 +18,7 @@ interface NativePayload {
   duration?: number;
   buffered?: number;
   message?: string;
+  value?: number;
 }
 
 const nativeBridge = (globalThis as { webkit?: { messageHandlers?: { musikeAudio?: Bridge } } }).webkit?.messageHandlers
@@ -194,6 +195,13 @@ class NativeAudio extends EventTarget {
         this._ended = true;
         this._paused = true;
         this.dispatchEvent(new Event("ended"));
+        break;
+      case "volumechange":
+        // The system volume moved (hardware buttons, Control Center); mirror it into the element.
+        if (typeof data.value === "number") {
+          this._volume = data.value;
+          this.dispatchEvent(new Event("volumechange"));
+        }
         break;
       case "error":
         this.error = { code: 4, message: data.message ?? "Playback failed" };

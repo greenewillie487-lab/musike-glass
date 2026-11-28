@@ -1,5 +1,6 @@
 import AVFoundation
 import Capacitor
+import MediaPlayer
 import WebKit
 
 /// Plays audio natively, so the music doesn't go through the web view's media stack.
@@ -21,9 +22,30 @@ final class MusikeAudio: NSObject, WKScriptMessageHandler {
     private var ticker: Any?
     private var statusObservation: NSKeyValueObservation?
     private var endObserver: NSObjectProtocol?
+    /// The system's own media volume: the hardware buttons and the app's slider are one and the same control.
+    private let volumeView = MPVolumeView(frame: CGRect(x: -4000, y: -100, width: 10, height: 10))
+    private var volumeObservation: NSKeyValueObservation?
 
     func attach(_ webView: WKWebView?) {
         self.webView = webView
+        // MPVolumeView only drives the system volume from inside the view hierarchy; park it off screen.
+        webView?.addSubview(volumeView)
+        volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] _, _ in
+            self?.emitVolume()
+        }
+        emitVolume()
+    }
+
+    /// Hardware buttons, Control Center and the app slider all land here, so the web is told on every change.
+    private func emitVolume() {
+        emit("volumechange", ["value": Double(AVAudioSession.sharedInstance().outputVolume)])
+    }
+
+    private func setSystemVolume(_ value: Float) {
+        DispatchQueue.main.async { [weak self] in
+            let slider = self?.volumeView.subviews.compactMap { $0 as? UISlider }.first
+            slider?.setValue(max(0, min(1, value)), animated: false)
+        }
     }
 
     static func remember(url: String, duration: Double) {
@@ -50,7 +72,8 @@ final class MusikeAudio: NSObject, WKScriptMessageHandler {
         case "seek":
             seek(body["to"] as? Double ?? 0)
         case "volume":
-            player?.volume = Float(body["value"] as? Double ?? 1)
+            // The app slider and the hardware buttons are the same system volume on iOS.
+            setSystemVolume(Float(body["value"] as? Double ?? 1))
         case "muted":
             player?.isMuted = body["value"] as? Bool ?? false
         default:

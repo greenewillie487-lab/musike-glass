@@ -38,14 +38,13 @@
 .lyrics-scroll::-webkit-scrollbar { display: none; }
 .lyrics-lines { padding: 14vh 3px 30vh; }
 .lyrics-panel .lyrics-lines { padding-inline: 18px; }
-.lyric-line { display: block; width: 100%; padding: 12px 4px; border: 0; background: transparent; text-align: start; white-space: pre-line; overflow-wrap: anywhere; font-family: -apple-system, BlinkMacSystemFont, "Geist Variable", sans-serif; font-size: clamp(27px, 7.7vw, 36px); font-weight: 750; line-height: 1.28; letter-spacing: -0.035em; color: rgb(255 255 255 / 0.43); transform-origin: left center; transition: color 400ms, filter 400ms, transform 500ms cubic-bezier(0.22, 1, 0.36, 1); }
+.lyric-line { display: block; width: 100%; padding: 12px 4px; border: 0; background: transparent; text-align: start; white-space: pre-line; overflow-wrap: anywhere; font-family: -apple-system, BlinkMacSystemFont, "Geist Variable", sans-serif; font-size: clamp(27px, 7.7vw, 36px); font-weight: 750; line-height: 1.28; letter-spacing: -0.035em; color: rgb(255 255 255 / 0.43); transition: color 400ms; }
 .lyrics-panel .lyric-line { font-size: 29px; }
-.lyrics-view[data-following="true"] .lyric-line:not([data-active="true"]) { filter: blur(0.65px); transform: scale(0.97); }
 .lyric-line[data-active="true"] { color: white; text-shadow: 0 2px 22px rgb(255 255 255 / 0.12); }
 .lyric-line[data-past="true"] { color: rgb(255 255 255 / 0.34); }
-.lyrics-view[data-following="true"] .lyric-line:focus-visible { color: #fff; filter: none; transform: none; }
+.lyrics-view[data-following="true"] .lyric-line:focus-visible { color: #fff; }
 @media (hover: hover) {
-  .lyric-line:hover:not([data-active="true"]) { color: rgb(255 255 255 / 0.72); filter: none; }
+  .lyric-line:hover:not([data-active="true"]) { color: rgb(255 255 255 / 0.72); }
 }
 .lyrics-plain { white-space: pre-line; overflow-wrap: anywhere; font-size: 28px; line-height: 1.6; font-weight: 700; letter-spacing: -0.025em; color: rgb(255 255 255 / 0.88); }
 .lyrics-credit { margin-top: 32px; font-size: 11px; color: rgb(255 255 255 / 0.6); font-weight: 500; }
@@ -78,6 +77,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .lyrics-backdrop img, .lyrics-skeleton i, .lyrics-dots i, .lyrics-intro span { animation: none; }
-  .lyric-line { transition: none; transform: none; filter: none; }
-  .lyrics-view[data-following="true"] .lyric-line:not([data-active="true"]) { transform: none; filter: none; }
+  .lyric-line { transition: none; }
 }
