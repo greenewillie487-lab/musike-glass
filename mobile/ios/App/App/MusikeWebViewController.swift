@@ -769,7 +769,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// SOLE writer of compactTitleLabel/compactTitleBackground alpha. progress
     /// is clamped to 0 at scroll-top, so progress == 0 always means alpha == 0
     /// (no faint "Home" behind the status bar).
-    private func applyScrollMaster(offsetY: CGFloat) {
+    /// fileprivate: the RouteHandler feeds the "scroll:" bridge messages into
+    /// this same master (one writer of all chrome state).
+    fileprivate func applyScrollMaster(offsetY: CGFloat) {
         let progress = max(0, min(1, (offsetY - 40) / 120))
         scrollProgress = progress
         // Web content is the real Home. The compact "Home" strip belongs only
