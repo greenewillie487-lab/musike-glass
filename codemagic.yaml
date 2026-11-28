@@ -125,6 +125,19 @@ workflows:
             sleep 50
             xcrun simctl io "$UDID" screenshot "$CM_BUILD_DIR/$NAME"
             test -s "$CM_BUILD_DIR/$NAME"
+            # A one-off WKWebView content-process death leaves a mostly black
+            # capture that is tiny next to a real one (observed: blank 156 KB,
+            # smallest known-good 1.86 MB). Retry once before giving up.
+            SIZE=$(wc -c < "$CM_BUILD_DIR/$NAME" | tr -d ' ')
+            if [ "$SIZE" -lt 400000 ]; then
+              echo "capture(): $NAME is ${SIZE} bytes (< 400000), looks blank; relaunching once"
+              xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+              sleep 3
+              xcrun simctl launch "$UDID" "$BUNDLE_ID" "$@" || true
+              sleep 50
+              xcrun simctl io "$UDID" screenshot "$CM_BUILD_DIR/$NAME" || true
+            fi
+            test -s "$CM_BUILD_DIR/$NAME"
           }
           xcrun simctl ui "$UDID" appearance dark || true
           capture preview-01-home-dark.png
