@@ -145,7 +145,8 @@ export default function New() {
 
   return (
     <div className="pt-[env(safe-area-inset-top)] pb-8">
-      <header className="safe-top sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg/85 px-4 pt-3 pb-4 backdrop-blur-xl md:bg-surface-1/85 md:px-6 md:pt-6">
+      <header className="safe-top sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg px-4 pt-3 pb-4 backdrop-blur-xl md:bg-surface-1 md:px-6 md:pt-6">
+        {/* Fully opaque like HomeHeader: a translucent sticky bar lets scrolled content ghost through under the status bar. */}
         <div className="flex min-w-0 items-center gap-2.5">
           <LogoMark className="size-7 shrink-0 text-accent" />
           {/* No dedicated nav key exists yet; library.newShort is the shipped "New" string. */}
