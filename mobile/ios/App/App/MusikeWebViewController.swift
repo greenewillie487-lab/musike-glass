@@ -34,6 +34,17 @@ private final class RouteHandler: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         guard let path = message.body as? String else { return }
+        // The page scrolls its own <main> scroller, so webView.scrollView's
+        // contentOffset never moves on a user scroll. The bridge reports the
+        // internal scroller's offset as "scroll:<n>"; it feeds the SAME
+        // scroll master (no direct chrome writes), keeping one writer.
+        if path.hasPrefix("scroll:") {
+            let y = Double(path.dropFirst("scroll:".count)) ?? 0
+            DispatchQueue.main.async { [weak controller] in
+                controller?.applyScrollMaster(offsetY: CGFloat(y))
+            }
+            return
+        }
         controller?.setRoute(path)
     }
 }
@@ -526,6 +537,18 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
           history.pushState = function(){ var r = push.apply(this, arguments); postRoute(); return r; };
           history.replaceState = function(){ var r = replace.apply(this, arguments); postRoute(); return r; };
           window.addEventListener('popstate', postRoute);
+          // The app scrolls its internal <main> scroller (html/body are
+          // height:100%), so WKScrollView contentOffset never moves on a user
+          // scroll. Report the real offset so the native chrome collapse
+          // tracks page scrolling. Capture phase catches the scroller's
+          // non-bubbling scroll events even before React mounts.
+          document.addEventListener('scroll', function(e){
+            var t = e.target;
+            if (t && t.nodeType === 1 && t.matches && t.matches('main.scroll-area')) {
+              var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeRoute;
+              if (h) h.postMessage('scroll:' + Math.round(t.scrollTop));
+            }
+          }, { passive: true, capture: true });
           document.addEventListener('DOMContentLoaded', postRoute);
           postRoute();
         })();
@@ -733,8 +756,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
             return
         }
-        // Web Home is the only Home: the WKWebView scroll view is the sole
-        // scroll master. KVO reports the offset; it never decides chrome state.
+        // WK-level scrolls (rubber band, programmatic) feed the same master as
+        // the page's internal scroller does through the "scroll:" bridge
+        // message; neither writes chrome state directly.
         guard scroll === webView?.scrollView else { return }
         applyScrollMaster(offsetY: scroll.contentOffset.y)
     }
