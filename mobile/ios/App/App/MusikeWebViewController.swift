@@ -658,6 +658,7 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     @objc private func openNowPlaying() {
         let js = """
         (function(){
+          if (window.__musikeOpenNowPlaying) { window.__musikeOpenNowPlaying(); return; }
           var h = window.webkit && window.webkit.messageHandlers &&
                   window.webkit.messageHandlers.musikeRoute;
           var buttons = document.querySelectorAll('button');

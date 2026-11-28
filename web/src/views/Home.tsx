@@ -6,7 +6,7 @@ import {
   RadioIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { LogoMark } from "../components/Brand";
 import { Section } from "../components/Page";
@@ -14,8 +14,9 @@ import { TrackList, TrackListSkeleton } from "../components/TrackList";
 import { useRemote } from "../hooks/useRemote";
 import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
+import { loadCharts, playChartSong, chartTrack, type ChartItem, type Charts } from "../lib/charts";
 import { paths } from "../lib/routes";
-import type { Genre, Playlist, Track } from "../lib/types";
+import type { Genre, GenrePage, Playlist, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
 import { useAppearance } from "../stores/appearance";
 import { useLibrary } from "../stores/library";
@@ -163,6 +164,18 @@ function PlaylistCard({ playlist }: { playlist: Playlist }) {
 
 function StationCard({ genre }: { genre: Genre }) {
   const t = useT();
+  const page = useRemote<GenrePage>(`station-covers:${genre.id}`, (signal) => api.genre(genre.id, signal));
+  // Real artwork from the genre's own tracks, reshuffled once a day — not on every visit.
+  const bucket = Math.floor(Date.now() / 86_400_000);
+  const tracks = page.status === "ok" ? page.data.tracks : [];
+  const picks: Track[] = [];
+  if (tracks.length > 0) {
+    const start = bucket % tracks.length;
+    for (let i = 0; i < tracks.length && picks.length < 4; i++) {
+      const candidate = tracks[(start + i * 7) % tracks.length];
+      if (!picks.some((p) => p.id === candidate.id)) picks.push(candidate);
+    }
+  }
   return (
     <Link
       to={paths.genre(genre.id)}
@@ -170,6 +183,13 @@ function StationCard({ genre }: { genre: Genre }) {
       className={`group flex ${railCardWidth} shrink-0 snap-start flex-col gap-2`}
     >
       <span className="relative block aspect-square overflow-hidden rounded-[14px]" style={{ background: cardGradient(genre.id) }}>
+        {picks.length >= 4 && (
+          <span className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+            {picks.map((p) => (
+              <img key={p.id} src={p.thumb || p.art} alt="" className="size-full object-cover" />
+            ))}
+          </span>
+        )}
         <span className="absolute inset-0 grid place-items-center">
           <RadioIcon size={40} weight="fill" className="text-white/90 drop-shadow-[0_2px_8px_rgb(0_0_0/0.35)] transition-transform duration-300 ease-out-expo group-hover:scale-110" />
         </span>
@@ -233,6 +253,14 @@ export default function Home() {
   const show = useAppearance();
   const lang = useI18n((s) => s.lang);
   const genres = useRemote<Genre[]>(`home-genres:${lang}`, () => api.genres());
+  const charts = useRemote<Charts | null>("home-charts", () => loadCharts());
+  const navigate = useNavigate();
+
+  const playChart = (item: ChartItem) => {
+    void playChartSong(item).then((played) => {
+      if (!played) navigate(`${paths.search}?q=${encodeURIComponent(`${item.name} ${item.artistName}`.trim())}`);
+    });
+  };
 
   const feature: Feature | null = history[0]
     ? {
@@ -281,6 +309,52 @@ export default function Home() {
       {status !== "loading" && (
         <div className="flex flex-col gap-10">
           {feature ? <FeatureCard feature={feature} /> : null}
+
+          {charts.status === "ok" && charts.data?.topSongs.length ? (
+            <Section title={t.home.topSongs}>
+              <Rail>
+                {charts.data.topSongs.slice(0, 16).map((item, i) => (
+                  <RecentCard key={`top-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
+                ))}
+              </Rail>
+            </Section>
+          ) : null}
+
+          {charts.status === "ok" && charts.data?.ghanaSongs.length ? (
+            <Section title={t.home.topSongsGh}>
+              <Rail>
+                {charts.data.ghanaSongs.slice(0, 16).map((item, i) => (
+                  <RecentCard key={`gh-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
+                ))}
+              </Rail>
+            </Section>
+          ) : null}
+
+          {charts.status === "ok" && charts.data?.newMusic.length ? (
+            <Section title={t.home.newMusic}>
+              <Rail>
+                {charts.data.newMusic.slice(0, 16).map((item, i) => (
+                  <RecentCard key={`new-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
+                ))}
+              </Rail>
+            </Section>
+          ) : null}
+
+          {charts.status === "ok" && charts.data?.topAlbums.length ? (
+            <Section title={t.home.topAlbums}>
+              <Rail>
+                {charts.data.topAlbums.slice(0, 16).map((item, i) => (
+                  <RecentCard
+                    key={`alb-${item.name}-${i}`}
+                    track={chartTrack(item, i)}
+                    onPlay={() =>
+                      navigate(`${paths.search}?q=${encodeURIComponent(`${item.name} ${item.artistName}`.trim())}&type=albums`)
+                    }
+                  />
+                ))}
+              </Rail>
+            </Section>
+          ) : null}
 
           {playlists.length > 0 && (
             <Section title={t.home.playlistsForYou}>

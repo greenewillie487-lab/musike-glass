@@ -49,6 +49,18 @@ export default function App() {
   const loadSystem = useSystem((s) => s.load);
   const main = useRef<HTMLElement>(null);
 
+  // The native miniplayer opens Now Playing; the web picks the right surface for the width:
+  // the full sheet on phones, the docked panel (or drawer) on tablets and desktops.
+  useEffect(() => {
+    (window as { __musikeOpenNowPlaying?: () => void }).__musikeOpenNowPlaying = () => {
+      if (window.matchMedia(MD).matches) useUi.getState().openPanel("playing");
+      else window.location.hash = NOW_PLAYING_HASH;
+    };
+    return () => {
+      delete (window as { __musikeOpenNowPlaying?: unknown }).__musikeOpenNowPlaying;
+    };
+  }, []);
+
   useShortcuts();
 
   useEffect(() => {

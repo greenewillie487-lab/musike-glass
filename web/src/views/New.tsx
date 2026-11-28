@@ -8,6 +8,7 @@ import { Section } from "../components/Page";
 import { useRemote } from "../hooks/useRemote";
 import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
+import { loadCharts, playChartSong, chartTrack, type Charts } from "../lib/charts";
 import { paths } from "../lib/routes";
 import type { Genre, GenrePage, Track } from "../lib/types";
 import { usePlayer } from "../player/player";
@@ -89,6 +90,13 @@ export default function New() {
   const navigate = useNavigate();
   const playList = usePlayer((s) => s.playList);
   const genres = useRemote<Genre[]>(`new-genres:${lang}`, () => api.genres());
+  const charts = useRemote<Charts | null>("home-charts", () => loadCharts());
+
+  const playChart = (item: Parameters<typeof playChartSong>[0]) => {
+    void playChartSong(item).then((played) => {
+      if (!played) navigate(`${paths.search}?q=${encodeURIComponent(`${item.name} ${item.artistName}`.trim())}`);
+    });
+  };
 
   // A partial or failed library response must never crash the page.
   const favorites = lib.favorites ?? [];
@@ -170,6 +178,16 @@ export default function New() {
       ) : (
         <main className="new-feed">
           {hero && <NewFeatureCard feature={{ ...hero, hero: true }} />}
+
+          {charts.status === "ok" && charts.data?.newMusic.length ? (
+            <Section title={t.home.newMusic}>
+              <div className="no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
+                {charts.data.newMusic.slice(0, 16).map((item, i) => (
+                  <RecentCard key={`new-${item.name}-${i}`} track={chartTrack(item, i)} onPlay={() => playChart(item)} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
 
           {rest.length > 0 && (
             <Section title={t.home.featured}>

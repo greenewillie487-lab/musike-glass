@@ -138,10 +138,13 @@ interface ListProps {
   header?: boolean;
   /** Artist page styling: 48px art, no track numbers, download + more actions. */
   artistStyle?: boolean;
+  /** Search-result mode: a tapped song plays and the queue fills with music cued around it (Apple's Autoplay), not the results list. */
+  cueAround?: boolean;
 }
 
-export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true, artistStyle = false }: ListProps) {
+export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted = true, header = true, artistStyle = false, cueAround = false }: ListProps) {
   const playList = usePlayer((s) => s.playList);
+  const startRadio = usePlayer((s) => s.startRadio);
   const t = useT();
   // Pages ask for the album column where it makes sense; Settings can turn it off everywhere.
   const showAlbum = useAppearance((s) => s.albumColumn) && albumWanted;
@@ -175,7 +178,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum: albumWanted 
             playlistId={playlistId}
             showAlbum={showAlbum}
             artistStyle={artistStyle}
-            onPlay={() => playList(context ?? tracks, i)}
+            onPlay={() => (cueAround ? startRadio(t) : playList(context ?? tracks, i))}
           />
         ))}
       </ul>
