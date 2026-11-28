@@ -42,9 +42,6 @@ private final class RouteHandler: NSObject, WKScriptMessageHandler {
             let y = Double(path.dropFirst("scroll:".count)) ?? 0
             DispatchQueue.main.async { [weak controller] in
                 guard let controller else { return }
-                // DIAGNOSTIC (preview-only): stamp the received offset on the
-                // miniplayer title so the capture proves the message arrived.
-                controller.diagnosticScrollLabel(offset: Int(y))
                 controller.applyScrollMaster(offsetY: CGFloat(y))
             }
             return
@@ -551,16 +548,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             if (t && t.nodeType === 1 && t.matches && t.matches('main.scroll-area')) {
               var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeRoute;
               var n = Math.round(t.scrollTop);
-              try {
-                var p = document.getElementById('scroll-probe');
-                if (!p) {
-                  p = document.createElement('div');
-                  p.id = 'scroll-probe';
-                  p.style.cssText = 'position:fixed;top:44px;left:8px;z-index:99999;background:#fa243d;color:#fff;font:13px monospace;padding:2px 7px;border-radius:6px;';
-                  document.body.appendChild(p);
-                }
-                p.textContent = 'SP:' + n;
-              } catch (err) {}
               if (h) h.postMessage('scroll:' + n);
             }
           }, { passive: true, capture: true });
@@ -630,14 +617,24 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         if (previewNewTab || previewRoute != nil) && (url == "/" || url.isEmpty) { return }
         let clean = url.components(separatedBy: "#").first ?? "/"
         let path = clean.components(separatedBy: "?").first ?? "/"
-        currentPath = path
         let sheetOpen = url.contains("#now-playing")
-        // A route change always starts with the compact title fully hidden.
-        // Route through the scroll master so it stays the only runtime writer.
-        applyScrollMaster(offsetY: 0)
+        // Gate the chrome reset on a REAL route change. The web app replays
+        // the same pathname (React Router history normalization, repeat
+        // posts) while the page is already scrolled; resetting chrome on a
+        // same-route replay killed the scroll collapse. On a genuine path
+        // change the web app's own scrollTo(0) feeds scroll:0 through the
+        // master, so one writer still owns the reset.
+        let pathChanged = path != currentPath
+        if pathChanged {
+            currentPath = path
+            // A route change always starts with the compact title fully hidden.
+            // Route through the scroll master so it stays the only runtime writer.
+            applyScrollMaster(offsetY: 0)
+        }
         tabBar.isHidden = sheetOpen
         miniGlass.isHidden = sheetOpen
         if sheetOpen { return }
+        guard pathChanged else { return }
         if path == "/new" { setActiveTab(1); return }
         if path.hasPrefix("/search") { setActiveTab(3) }
         else if path.hasPrefix("/library") || path.hasPrefix("/favorites") ||
@@ -784,11 +781,6 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// SOLE writer of compactTitleLabel/compactTitleBackground alpha. progress
     /// is clamped to 0 at scroll-top, so progress == 0 always means alpha == 0
     /// (no faint "Home" behind the status bar).
-    /// DIAGNOSTIC (preview-only): show the last received scroll offset on the
-    /// miniplayer so the capture proves the web→native message arrived.
-    func diagnosticScrollLabel(offset: Int) {
-        miniTitle.text = "S:\(offset)"
-    }
 
     /// fileprivate: the RouteHandler feeds the "scroll:" bridge messages into
     /// this same master (one writer of all chrome state).
