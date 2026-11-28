@@ -4,8 +4,7 @@ import { Link, useLocation, useParams } from "react-router";
 import { Artwork } from "../components/Artwork";
 import { IconButton, PlayDisc } from "../components/IconButton";
 import { BackButton, EmptyState, PageHeader } from "../components/Page";
-import { SelectableTrackList } from "../components/Selection";
-import { TrackListSkeleton } from "../components/TrackList";
+import { TrackList, TrackListSkeleton } from "../components/TrackList";
 import { useRemote } from "../hooks/useRemote";
 import { useI18n, useT } from "../i18n";
 import { api } from "../lib/api";
@@ -131,7 +130,7 @@ export default function Album() {
 
       {album &&
         (tracks.length ? (
-          <SelectableTrackList key={id} tracks={tracks} numbered />
+          <TrackList key={id} tracks={tracks} context={tracks} showAlbum={false} />
         ) : (
           <EmptyState icon={<MusicNotesIcon size={28} />} title={t.album.noTracks} body={t.album.noTracksBody} />
         ))}

@@ -126,11 +126,10 @@ function Header() {
   );
 }
 
-function SectionTitle({ title, detail }: { title: string; detail?: string }) {
+function SectionTitle({ title }: { title: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-4 md:px-6">
       <h2 className="text-[22px] leading-tight font-bold tracking-tight">{title}</h2>
-      {detail && <span className="shrink-0 font-mono text-xs text-fg-3 tabular-nums">{detail}</span>}
     </div>
   );
 }
@@ -185,11 +184,11 @@ export default function Library() {
   ].slice(0, 9);
 
   const rows: LibraryGroupRow[] = [
-    { id: "playlists", label: t.library.sectionPlaylists, icon: <ListBulletsIcon size={20} />, detail: String(playlists.length + 2), href: "#library-playlists" },
-    { id: "artists", label: t.library.sectionArtists, icon: <MicrophoneIcon size={20} />, detail: String(artists.length), href: "#library-artists" },
-    { id: "albums", label: t.library.sectionAlbums, icon: <StackIcon size={20} />, detail: String(albums.length), href: "#library-albums" },
-    { id: "songs", label: t.library.sectionSongs, icon: <MusicNotesIcon size={20} />, detail: String(tracks.length), href: "#library-songs" },
-    { id: "downloaded", label: t.library.sectionDownloaded, icon: <DownloadSimpleIcon size={20} />, detail: "0", href: "#library-downloaded" },
+    { id: "playlists", label: t.library.sectionPlaylists, icon: <ListBulletsIcon size={20} />, href: "#library-playlists" },
+    { id: "artists", label: t.library.sectionArtists, icon: <MicrophoneIcon size={20} />, href: "#library-artists" },
+    { id: "albums", label: t.library.sectionAlbums, icon: <StackIcon size={20} />, href: "#library-albums" },
+    { id: "songs", label: t.library.sectionSongs, icon: <MusicNotesIcon size={20} />, href: "#library-songs" },
+    { id: "downloaded", label: t.library.sectionDownloaded, icon: <DownloadSimpleIcon size={20} />, href: "#library-downloaded" },
   ];
 
   const tileClass = "grid grid-cols-3 gap-x-3 gap-y-4 px-4 md:grid-cols-6 lg:grid-cols-9 md:px-6";
@@ -210,7 +209,7 @@ export default function Library() {
 
       {recentlyAdded.length > 0 && (
         <section className="pt-7">
-          <SectionTitle title={t.library.recentlyAdded} detail={String(recentlyAdded.length)} />
+          <SectionTitle title={t.library.recentlyAdded} />
           <ul className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
             {recentlyAdded.map((track, i) => (
               <li key={track.id} className="w-[42vw] max-w-[220px] shrink-0 snap-start">
@@ -257,7 +256,7 @@ export default function Library() {
 
       {artists.length > 0 && (
         <section id="library-artists" className="scroll-mt-28 pt-8">
-          <SectionTitle title={t.library.sectionArtists} detail={String(artists.length)} />
+          <SectionTitle title={t.library.sectionArtists} />
           <ul className="no-scrollbar mt-4 flex snap-x gap-4 overflow-x-auto px-4 pb-1 md:scroll-px-6 md:px-6">
             {artists.map((artist) => (
               <li key={artist.name} className="w-24 shrink-0 snap-start">
@@ -270,7 +269,7 @@ export default function Library() {
 
       {albums.length > 0 && (
         <section id="library-albums" className="scroll-mt-28 pt-8">
-          <SectionTitle title={t.library.sectionAlbums} detail={String(albums.length)} />
+          <SectionTitle title={t.library.sectionAlbums} />
           <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-5 px-4 sm:grid-cols-3 md:px-6 lg:grid-cols-5 2xl:grid-cols-7">
             {albums.slice(0, 14).map((album) => (
               <li key={album.name}>
@@ -291,7 +290,7 @@ export default function Library() {
 
       {tracks.length > 0 && (
         <section id="library-songs" className="scroll-mt-28 pt-8">
-          <SectionTitle title={t.library.sectionSongs} detail={String(tracks.length)} />
+          <SectionTitle title={t.library.sectionSongs} />
           <div className="mt-2 px-2 md:px-3">
             <TrackList tracks={tracks.slice(0, 12)} context={tracks} header={false} />
           </div>
@@ -304,7 +303,7 @@ export default function Library() {
       )}
 
       <section id="library-downloaded" className="scroll-mt-28 pt-8">
-        <SectionTitle title={t.library.sectionDownloaded} detail="0" />
+        <SectionTitle title={t.library.sectionDownloaded} />
         <div className="mx-4 mt-3 flex items-center gap-3 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line md:mx-6">
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-3 text-fg-2">
             <DownloadSimpleIcon size={20} />
