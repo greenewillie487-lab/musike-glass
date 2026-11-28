@@ -41,7 +41,11 @@ private final class RouteHandler: NSObject, WKScriptMessageHandler {
         if path.hasPrefix("scroll:") {
             let y = Double(path.dropFirst("scroll:".count)) ?? 0
             DispatchQueue.main.async { [weak controller] in
-                controller?.applyScrollMaster(offsetY: CGFloat(y))
+                guard let controller else { return }
+                // DIAGNOSTIC (preview-only): stamp the received offset on the
+                // miniplayer title so the capture proves the message arrived.
+                controller.diagnosticScrollLabel(offset: Int(y))
+                controller.applyScrollMaster(offsetY: CGFloat(y))
             }
             return
         }
@@ -546,7 +550,18 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
             var t = e.target;
             if (t && t.nodeType === 1 && t.matches && t.matches('main.scroll-area')) {
               var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.musikeRoute;
-              if (h) h.postMessage('scroll:' + Math.round(t.scrollTop));
+              var n = Math.round(t.scrollTop);
+              try {
+                var p = document.getElementById('scroll-probe');
+                if (!p) {
+                  p = document.createElement('div');
+                  p.id = 'scroll-probe';
+                  p.style.cssText = 'position:fixed;top:44px;left:8px;z-index:99999;background:#fa243d;color:#fff;font:13px monospace;padding:2px 7px;border-radius:6px;';
+                  document.body.appendChild(p);
+                }
+                p.textContent = 'SP:' + n;
+              } catch (err) {}
+              if (h) h.postMessage('scroll:' + n);
             }
           }, { passive: true, capture: true });
           document.addEventListener('DOMContentLoaded', postRoute);
@@ -769,10 +784,15 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// SOLE writer of compactTitleLabel/compactTitleBackground alpha. progress
     /// is clamped to 0 at scroll-top, so progress == 0 always means alpha == 0
     /// (no faint "Home" behind the status bar).
+    /// DIAGNOSTIC (preview-only): show the last received scroll offset on the
+    /// miniplayer so the capture proves the web→native message arrived.
+    func diagnosticScrollLabel(offset: Int) {
+        miniTitle.text = "S:\(offset)"
+    }
+
     /// fileprivate: the RouteHandler feeds the "scroll:" bridge messages into
     /// this same master (one writer of all chrome state).
-    fileprivate func applyScrollMaster(offsetY: CGFloat) {
-        let progress = max(0, min(1, (offsetY - 40) / 120))
+    fileprivate func applyScrollMaster(offsetY: CGFloat) {        let progress = max(0, min(1, (offsetY - 40) / 120))
         scrollProgress = progress
         // Web content is the real Home. The compact "Home" strip belongs only
         // to the web Home route while native glass chrome is enabled.
