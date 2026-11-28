@@ -273,8 +273,8 @@ export const en = {
 
   search: {
     title: "Search",
-    inputLabel: "Search songs, artists, videos or paste a YouTube link",
-    placeholder: "Songs, artists or a YouTube link",
+    inputLabel: "Search artists, songs, lyrics & more",
+    placeholder: "Artist, Songs, Lyrics & More",
     clear: "Clear search",
     searchSeparately: (n: number) => `Search ${n} songs separately`,
     resultType: "Result type",
