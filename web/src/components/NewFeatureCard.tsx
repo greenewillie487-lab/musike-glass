@@ -70,7 +70,7 @@ export function NewFeatureCard({ feature }: { feature: NewFeature }) {
         <div className="flex items-start justify-between gap-3">
           <span className="new-kicker truncate pt-1">{feature.kicker}</span>
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-black/25 px-2 py-1 text-[10px] font-bold tracking-wide text-white/90">
-            <LogoMark className="size-3" /> musike
+            <LogoMark className="size-3" /> zidon
           </span>
         </div>
 

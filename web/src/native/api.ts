@@ -102,7 +102,7 @@ export const api: MusikeApi = {
   importLibrary: (backup, mode) =>
     call(async () => {
       const b = (backup ?? {}) as { format?: unknown; version?: unknown; library?: unknown };
-      if (b.format !== "musike-backup") throw fail(400, "notBackup");
+      if (b.format !== "musike-backup" && b.format !== "zidon-backup") throw fail(400, "notBackup");
       if (typeof b.version !== "number" || b.version > 1) throw fail(400, "newerBackup");
       return library.importLibrary(b.library, mode);
     }),

@@ -1,6 +1,6 @@
 {
 	"appId": "app.musike.android",
-	"appName": "Musike",
+	"appName": "Zidon",
 	"webDir": "../web/dist-native",
 	"backgroundColor": "#0B0C0F",
 	"android": {

@@ -36,7 +36,7 @@ async function request(path: string, signal: AbortSignal): Promise<unknown> {
   await new Promise((resolve) => setTimeout(resolve, Math.max(0, nextRequest - Date.now())));
   signal.throwIfAborted();
   const url = `https://lrclib.net/api${path}`;
-  const headers = { "Lrclib-Client": `Musike/${__APP_VERSION__} (https://github.com/Ernani1234/musike)` };
+  const headers = { "Lrclib-Client": `Zidon/${__APP_VERSION__}` };
   let status: number;
   let body: unknown;
   let retry: string | undefined;

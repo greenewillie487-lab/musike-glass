@@ -32,7 +32,7 @@ function cardGradient(key: string) {
 function CardBadge() {
   return (
     <span className="grid h-6 items-center gap-1 rounded-full bg-black/25 px-2 text-[10px] font-bold tracking-wide text-white/90 backdrop-blur-sm">
-      <LogoMark className="size-3" /> musike
+      <LogoMark className="size-3" /> zidon
     </span>
   );
 }

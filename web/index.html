@@ -7,10 +7,10 @@
     <meta name="description" content="Your music, uninterrupted." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Musike" />
+    <meta name="apple-mobile-web-app-title" content="Zidon" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>Musike</title>
+    <title>Zidon</title>
     <script>
       try {
         var t = localStorage.getItem("musike:theme");
@@ -36,7 +36,7 @@
         // Appearance chosen in Settings, applied before the first paint.
         var css = localStorage.getItem("musike:accent-css");
         var a = JSON.parse(localStorage.getItem("musike:appearance") || "{}");
-        // Devices still on the old Musike green (the old default) migrate to the new default;
+        // Devices still on the old Zidon green (the old default) migrate to the new default;
         // the stored key must go too, or apply() would regenerate the old accent on boot.
         if (a.accent === "#c3ec52") {
           delete a.accent;
