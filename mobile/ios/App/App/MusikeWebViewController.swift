@@ -778,9 +778,9 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         }
         if previewNewTab || previewRoute != nil {
             let route = previewRoute ?? "/new"
-            if route.hasPrefix("/search") { setActiveTab(4) }
+            if route.hasPrefix("/search") { setActiveTab(3) }
             else if route.hasPrefix("/library") || route.hasPrefix("/favorites") ||
-                    route.hasPrefix("/history") || route.hasPrefix("/playlist") { setActiveTab(3) }
+                    route.hasPrefix("/history") || route.hasPrefix("/playlist") { setActiveTab(2) }
             else { setActiveTab(1) }
             // The web app owns the destination. No native placeholder: just
             // navigate once its initial route post has settled.
@@ -800,13 +800,14 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
         applyPreviewScroll()
         if previewSeedHistory {
             seedListeningHistory()
-        } else if previewScrollOffset > 0, !previewNewTab, previewRoute == nil {
+        } else if previewScrollOffset > 0, previewRoute == nil {
             // Web content is still loading when capacitorDidLoad runs. The page
             // script re-applies the scroll on load and short timers, and these
-            // native retries cover a slow first paint. Only the scroll position
+            // native retries cover a slow first paint for both scroll targets
+            // (Home plain, New via -previewTab=new). Only the scroll position
             // is set here — the contentOffset KVO still drives every title/bar
             // value; nothing is pinned directly.
-            for delay in [3.0, 6.0, 9.0] {
+            for delay in [3.0, 6.0, 9.0, 13.0] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     self?.applyPreviewScroll()
                 }
@@ -869,8 +870,11 @@ final class MusikeWebViewController: CAPBridgeViewController, UITabBarDelegate, 
     /// reports any resulting offset through the contentOffset KVO, which stays
     /// the single source of truth for native title/chrome state.
     private func applyPreviewScroll() {
-        guard previewScrollOffset > 0, !previewNewTab, previewRoute == nil,
-              currentPath == "/" else { return }
+        // The scroll applies to the page the preview landed on: Home for a
+        // plain scroll, the New page for -previewTab=new. currentPath must
+        // match the destination so the preview's own navigation is not fought.
+        guard previewScrollOffset > 0, previewRoute == nil else { return }
+        guard currentPath == (previewNewTab ? "/new" : "/") else { return }
         let y = Int(previewScrollOffset.rounded())
         let js = """
         (function(){
